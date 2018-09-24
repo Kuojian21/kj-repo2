@@ -1,9 +1,9 @@
 package com.kj.repo.bean.crypt;
 
 import java.nio.charset.Charset;
+import java.security.Key;
 
 import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 
 import org.apache.commons.codec.binary.Base64;
@@ -14,7 +14,7 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 
 public class KjDecrypt extends KjCrypt {
 
-    public KjDecrypt(String algorithm, SecretKey key, IvParameterSpec ivp) {
+    public KjDecrypt(String algorithm, Key key, IvParameterSpec ivp) {
         super(new GenericObjectPool<>(new BasePooledObjectFactory<Cipher>() {
             @Override
             public PooledObject<Cipher> wrap(Cipher cipher) {
