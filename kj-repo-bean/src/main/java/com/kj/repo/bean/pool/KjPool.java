@@ -11,7 +11,7 @@ public abstract class KjPool<T, H> {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
                 kjFactory.close();
-                System.out.println("close com.java.kj.base.KjPool:" + KjPool.this.getClass().getName());
+                System.out.println("close com.kj.repo.bean.pool.KjPool:" + KjPool.this.getClass().getName());
             } catch (Exception e) {
                 e.printStackTrace();
             }

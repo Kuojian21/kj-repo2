@@ -18,6 +18,7 @@
         <module>kj-repo-dao</module>
         <module>kj-repo-tool</module>
         <module>kj-repo-shell</module>
+        <module>kj-repo-test</module>
     </modules>
 
     <properties>
