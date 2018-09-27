@@ -10,7 +10,7 @@ import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import com.google.common.base.Stopwatch;
-import com.kj.repo.util.js.KjJavaScript;
+import com.kj.repo.util.engine.KjScriptEngine;
 
 public class KjJavaScriptTest {
 
@@ -18,8 +18,10 @@ public class KjJavaScriptTest {
 
     static {
         try {
-            js =
-                    (Invocable) KjJavaScript.engine("function say(module){ if(module=='PULL') return (1000 + Math.floor(Math.random()*1000));else return (100 + Math.floor(Math.random()*100)) }");
+            ScriptEngine engine =
+                    KjScriptEngine.jsEngine();
+            engine.eval("function say(module){ if(module=='PULL') return (1000 + Math.floor(Math.random()*1000));else return (100 + Math.floor(Math.random()*100)) }");
+            js = (Invocable) engine;
         } catch (ScriptException e) {
             e.printStackTrace();
         }
