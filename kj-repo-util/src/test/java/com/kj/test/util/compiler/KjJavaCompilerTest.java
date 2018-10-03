@@ -1,10 +1,10 @@
-package com.kj.test.util.jc;
+package com.kj.test.util.compiler;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-import com.kj.repo.util.jc.KjJavaCompiler;
+import com.kj.repo.util.compiler.KjJavaCompiler;
 
 public class KjJavaCompilerTest {
 
