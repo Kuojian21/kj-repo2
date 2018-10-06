@@ -21,11 +21,10 @@ public class CryptTest {
 			System.out.println(Base64.encodeBase64String(keyPair.getPublic().getEncoded()));
 			System.out.println(Base64.encodeBase64String(keyPair.getPrivate().getEncoded()));
 
-			KjCryptFactory factory = KjCryptFactory.factory("DESede/CBC/PKCS5Padding", "01234567", "DESede",
+			KjEncrypt encrypt = KjCryptFactory.kjEncrypt("DESede/CBC/PKCS5Padding", "01234567", "DESede",
 					"wnwT1v1kkhoEwnnEGSnE6ciw6S8E4w5U");
-
-			KjEncrypt encrypt = factory.kjEncrypt();
-			KjDecrypt decrypt = factory.kjDecrypt();
+			KjDecrypt decrypt = KjCryptFactory.kjDecrypt("DESede/CBC/PKCS5Padding", "01234567", "DESede",
+					"wnwT1v1kkhoEwnnEGSnE6ciw6S8E4w5U");
 			for (int i = 0; i < 10; i++) {
 				new Thread(new Runnable() {
 					@Override

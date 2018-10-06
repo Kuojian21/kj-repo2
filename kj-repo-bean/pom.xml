@@ -12,6 +12,14 @@
     <artifactId>kj-repo-bean</artifactId>
 
     <dependencies>
+        <dependency>
+            <groupId>com.kj.repo</groupId>
+            <artifactId>kj-repo-base</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.kj.repo</groupId>
+            <artifactId>kj-repo-util</artifactId>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/cglib/cglib -->
         <dependency>
             <groupId>cglib</groupId>

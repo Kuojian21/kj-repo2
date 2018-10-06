@@ -19,6 +19,7 @@
         <module>kj-repo-tool</module>
         <module>kj-repo-shell</module>
         <module>kj-repo-test</module>
+        <module>kj-repo-base</module>
     </modules>
 
     <properties>
@@ -56,6 +57,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.kj.repo</groupId>
+                <artifactId>kj-repo-base</artifactId>
+                <version>1.0-SNAPSHOT</version>
+            </dependency>
             <dependency>
                 <groupId>com.kj.repo</groupId>
                 <artifactId>kj-repo-bean</artifactId>
