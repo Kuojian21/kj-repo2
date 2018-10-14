@@ -11,93 +11,99 @@ import com.kj.repo.util.close.KjClose;
 
 public abstract class KjFactoryImpl<T> implements KjFactory<T> {
 
-    private final AtomicInteger count = new AtomicInteger(0);
-    private final Integer limit;
-    private final ConcurrentLinkedQueue<T> queue = new ConcurrentLinkedQueue<T>();
+	private final AtomicInteger count = new AtomicInteger(0);
+	private final Integer limit;
+	private final ConcurrentLinkedQueue<T> queue = new ConcurrentLinkedQueue<T>();
 
-    private final AtomicBoolean shutdown = new AtomicBoolean(false);
-    private final AtomicInteger notify = new AtomicInteger(0);
-    private final ReentrantLock lock = new ReentrantLock();
-    private final Condition cond = lock.newCondition();
+	private final AtomicBoolean shutdown = new AtomicBoolean(false);
+	private final AtomicInteger notify = new AtomicInteger(0);
+	private final ReentrantLock lock = new ReentrantLock();
+	private final Condition cond = lock.newCondition();
 
-    public KjFactoryImpl(int limit) {
-        this.limit = limit;
-    }
+	public KjFactoryImpl(int limit) {
+		this.limit = limit;
+	}
 
-    public abstract T create();
+	public abstract T create() throws Exception;
 
-    @Override
-    public T borrowObject() throws Exception {
-        if (this.shutdown.get()) {
-            return null;
-        }
-        T t = this.queue.poll();
-        if (t != null) {
-            return t;
-        }
-        try {
-            lock.lock();
-            if (this.count.get() < limit) {
-                this.count.incrementAndGet();
-                return this.create();
-            }
-            this.notify.incrementAndGet();
-            t = this.queue.poll();
-            if (t != null) {
-                this.notify.decrementAndGet();
-                return t;
-            }
-            this.cond.await(300, TimeUnit.MILLISECONDS);
-            this.notify.decrementAndGet();
-            return this.borrowObject();
-        } finally {
-            lock.unlock();
-        }
+	@Override
+	public T borrowObject() throws Exception {
+		if (this.shutdown.get()) {
+			return null;
+		}
+		T t = this.queue.poll();
+		if (t != null) {
+			return t;
+		}
+		try {
+			lock.lock();
+			if (this.count.get() < limit) {
+				this.count.incrementAndGet();
+				t = this.create();
+				if (t != null) {
+					return t;
+				}
+			}
+			this.notify.incrementAndGet();
+			t = this.queue.poll();
+			if (t != null) {
+				this.notify.decrementAndGet();
+				return t;
+			}
+			this.cond.await(300, TimeUnit.MILLISECONDS);
+			this.notify.decrementAndGet();
+			return this.borrowObject();
+		} finally {
+			lock.unlock();
+		}
 
-    }
+	}
 
-    @Override
-    public void returnObject(T obj) throws Exception {
-        this.queue.add(obj);
-        if (this.notify.get() >= 1) {
-            try {
-                lock.lock();
-                if (this.notify.get() >= 1) {
-                    cond.signalAll();
-                }
-            } finally {
-                lock.unlock();
-            }
-        }
+	@Override
+	public void returnObject(T obj) throws Exception {
+		if (obj == null) {
+			return;
+		}
+		this.queue.add(obj);
+		if (this.notify.get() >= 1) {
+			try {
+				lock.lock();
+				if (this.notify.get() >= 1) {
+					cond.signalAll();
+				}
+			} finally {
+				lock.unlock();
+			}
+		}
 
-    }
+	}
 
-    @Override
-    public void close() throws Exception {
-        this.shutdown.set(true);
-        T t = null;
-        while ((t = this.queue.poll()) != null) {
-            this.count.decrementAndGet();
-            KjClose.close(t);
-        }
+	@Override
+	public void close() throws Exception {
+		this.shutdown.set(true);
+		T t = null;
+		while ((t = this.queue.poll()) != null) {
+			this.count.decrementAndGet();
+			KjClose.close(t);
+		}
 
-        while (this.count.get() > 0) {
-            try {
-                lock.lock();
-                this.notify.incrementAndGet();
-                t = this.queue.poll();
-                if (t != null) {
-                    this.count.decrementAndGet();
-                    this.notify.decrementAndGet();
-                    KjClose.close(t);
-                    continue;
-                }
-                this.cond.await(300, TimeUnit.MILLISECONDS);
-                this.notify.decrementAndGet();
-            } finally {
-                lock.unlock();
-            }
-        }
-    }
+		while (this.count.get() > 0) {
+			try {
+				lock.lock();
+				this.notify.incrementAndGet();
+				t = this.queue.poll();
+				if (t != null) {
+					this.count.decrementAndGet();
+					this.notify.decrementAndGet();
+					KjClose.close(t);
+					continue;
+				}
+				this.cond.await(300, TimeUnit.MILLISECONDS);
+				this.notify.decrementAndGet();
+			} finally {
+				lock.unlock();
+			}
+		}
+	}
 
 }

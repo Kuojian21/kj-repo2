@@ -2,20 +2,15 @@ package com.kj.repo.bean.pool;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
 
-public abstract class KjPool<T, H> {
+import com.kj.repo.bean.base.KjBase;
+
+public abstract class KjPool<T, H> extends KjBase {
 
     private final KjFactory<T> kjFactory;
 
     public KjPool(KjFactory<T> kjFactory) {
+        super(kjFactory::close);
         this.kjFactory = kjFactory;
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            try {
-                kjFactory.close();
-                System.out.println("close com.kj.repo.bean.pool.KjPool:" + KjPool.this.getClass().getName());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }));
     }
 
     public KjPool(GenericObjectPool<T> pool) {
