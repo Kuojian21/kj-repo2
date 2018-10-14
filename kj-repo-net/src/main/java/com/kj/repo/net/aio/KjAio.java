@@ -1,6 +1,5 @@
 package com.kj.repo.net.aio;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
@@ -12,7 +11,7 @@ import com.kj.repo.net.base.KjFuture;
 
 public class KjAio {
 
-    private final ConcurrentMap<AsynchronousSocketChannel, ConcurrentLinkedQueue<KjFuture>> queueMaps = Maps
+    final ConcurrentMap<AsynchronousSocketChannel, ConcurrentLinkedQueue<KjFuture>> queueMaps = Maps
             .newConcurrentMap();
     private final ConcurrentMap<AsynchronousSocketChannel, KjFuture> futuresMaps = Maps.newConcurrentMap();
     private final KjAioPipeline pipeline;
@@ -27,9 +26,9 @@ public class KjAio {
             @Override
             public void completed(Integer result, KjAio kjAio) {
                 try {
-                    ByteBuffer bb = kjAio.pipeline.read(channel, buffer);
+                    ByteBuffer bb = kjAio.pipeline.read(channel, kjAio, buffer);
                     read(channel, kjAio, bb);
-                } catch (IOException e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }

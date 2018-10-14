@@ -12,10 +12,10 @@ public class KjInt {
 
 	public static byte[] toBytes(int i) {
 		byte[] bytes = new byte[4];
-		bytes[0] = (byte) (i & 0xff);
-		bytes[1] = (byte) ((i >> 8) & 0xff);
-		bytes[2] = (byte) ((i >> 16) & 0xff);
-		bytes[3] = (byte) ((i >> 24) & 0xff);
+		bytes[0] = (byte) ((i >> 24) & 0xff);
+		bytes[1] = (byte) ((i >> 16) & 0xff);
+		bytes[2] = (byte) ((i >> 8) & 0xff);
+		bytes[3] = (byte) (i & 0xff);
 		return bytes;
 	}
 

@@ -4,9 +4,11 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.kj.repo.bean.pool.KjFactory;
 import com.kj.repo.bean.pool.KjFactoryImpl;
+import com.kj.repo.net.base.KjFuture;
 
 public class KjAioClient extends KjAio {
     private KjFactory<AsynchronousSocketChannel> kjFactory;
@@ -21,6 +23,7 @@ public class KjAioClient extends KjAio {
             @Override
             public AsynchronousSocketChannel create() throws Exception {
                 AsynchronousSocketChannel channel = AsynchronousSocketChannel.open();
+                kjAio.queueMaps.putIfAbsent(channel, new ConcurrentLinkedQueue<KjFuture>());
                 channel.connect(new InetSocketAddress(ip, port), null, new CompletionHandler<Void, Void>() {
                     @Override
                     public void completed(Void result, Void attachment) {

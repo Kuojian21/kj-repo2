@@ -5,7 +5,9 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
+import com.kj.repo.net.base.KjFuture;
 import com.kj.repo.util.executor.KjExecutor;
 
 public class KjAioServer extends KjAio {
@@ -22,6 +24,7 @@ public class KjAioServer extends KjAio {
             while (true) {
                 try {
                     AsynchronousSocketChannel channel = server.accept().get();
+                    kjAio.queueMaps.putIfAbsent(channel, new ConcurrentLinkedQueue<KjFuture>());
                     read(channel, kjAio, ByteBuffer.allocate(4096));
                 } catch (InterruptedException e) {
                     e.printStackTrace();
