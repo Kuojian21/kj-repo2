@@ -37,7 +37,7 @@ public class JSoupXpathTest {
         // String xpath = "//li[@class='project-row']/div/a/@href";
 
         Set<String> sets = Sets.newHashSet();
-        File file = new File("/Users/kuojian21/kj/kuaishou-promotion-api/m.list");
+        File file = new File("/Users/kuojian21/kj/m.list");
         List<JXNode> objs = KjJSoupXpath.parse(new FileReader(file)).selN(xpath);
         for (JXNode obj : objs) {
             List<JXNode> o = obj.sel("//td");
