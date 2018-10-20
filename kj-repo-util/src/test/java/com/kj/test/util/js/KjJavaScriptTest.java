@@ -31,7 +31,6 @@ public class KjJavaScriptTest {
     public static void run(String flag) throws Exception {
         Stopwatch stopwatch = Stopwatch.createStarted();
         int total = 0;
-        String[] m = new String[]{"PUSH", "PULL"};
         for (int i = 0; i < 1000000; i++) {
             total += ((Double) js.invokeFunction("say", "PULL")).intValue();
         }

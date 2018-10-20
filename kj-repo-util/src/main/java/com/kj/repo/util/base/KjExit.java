@@ -1,12 +1,13 @@
 package com.kj.repo.util.base;
 
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
-import com.kj.repo.base.func.Action;
+import com.kj.repo.base.func.KjAction;
 
 public class KjExit {
 
-	public static void exit(Action action) {
+	public static void exit(KjAction action) {
 		if (action != null) {
 			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 				try {
@@ -29,7 +30,12 @@ public class KjExit {
 	public static void exit(ExecutorService service) {
 		if (service != null) {
 			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-				service.shutdown();
+				try {
+					service.shutdown();
+					service.awaitTermination(3, TimeUnit.MINUTES);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}));
 		}
 	}

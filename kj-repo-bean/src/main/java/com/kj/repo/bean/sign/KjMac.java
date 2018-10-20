@@ -10,7 +10,7 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 
 import com.kj.repo.bean.pool.KjPool;
 
-public class KjMac extends KjPool<Mac, byte[]> implements KjSign {
+public class KjMac extends KjPool<Mac> implements KjSign {
 
     public KjMac(String algorithm, SecretKey key) {
         super(new GenericObjectPool<>(new BasePooledObjectFactory<Mac>() {
@@ -35,13 +35,10 @@ public class KjMac extends KjPool<Mac, byte[]> implements KjSign {
     }
 
     @Override
-    public byte[] execute(Mac mac, byte[] bytes, Object... args) throws Exception {
-        mac.update(bytes);
-        return mac.doFinal();
-    }
-
-    @Override
     public byte[] sign(byte[] src) throws Exception {
-        return super.execute(src);
+        return super.execute(t -> {
+            t.update(src);
+            return t.doFinal();
+        });
     }
 }

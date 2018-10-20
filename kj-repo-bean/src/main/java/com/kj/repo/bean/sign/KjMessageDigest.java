@@ -9,7 +9,7 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 
 import com.kj.repo.bean.pool.KjPool;
 
-public class KjMessageDigest extends KjPool<MessageDigest, byte[]> implements KjSign {
+public class KjMessageDigest extends KjPool<MessageDigest> implements KjSign {
 
     public KjMessageDigest(String algorithm) {
         super(new GenericObjectPool<>(new BasePooledObjectFactory<MessageDigest>() {
@@ -30,15 +30,12 @@ public class KjMessageDigest extends KjPool<MessageDigest, byte[]> implements Kj
 
         }, KjSignFactory.config()));
     }
-
-    @Override
-    public byte[] execute(MessageDigest digest, byte[] bytes, Object... args) throws Exception {
-        digest.update(bytes);
-        return digest.digest();
-    }
-
+    
     @Override
     public byte[] sign(byte[] src) throws Exception {
-        return super.execute(src);
+        return super.execute(t -> {
+            t.update(src);
+            return t.digest();
+        });
     }
 }

@@ -3,11 +3,11 @@ package com.kj.repo.base.func;
 import java.util.Objects;
 
 @FunctionalInterface
-public interface Action {
+public interface KjAction {
 
     void doAction() throws Exception;
 
-    default Action before(Action before) {
+    default KjAction before(KjAction before) {
         Objects.requireNonNull(before);
         return () -> {
             before.doAction();
@@ -15,7 +15,7 @@ public interface Action {
         };
     }
 
-    default Action after(Action after) {
+    default KjAction after(KjAction after) {
         Objects.requireNonNull(after);
         return () -> {
             doAction();

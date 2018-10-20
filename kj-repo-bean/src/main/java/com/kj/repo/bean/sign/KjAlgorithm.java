@@ -28,4 +28,7 @@ public enum KjAlgorithm {
         MAC, DIGEST, SIGN, VERIFY
     }
 
+    public String getAlgorithm() {
+        return algorithm;
+    }
 }

@@ -20,7 +20,7 @@ import com.jcraft.jsch.Session;
 import com.jcraft.jsch.SftpException;
 import com.kj.repo.bean.pool.KjPool;
 
-public class KjJsch extends KjPool<ChannelSftp, KjJsch.TYPE> {
+public class KjJsch extends KjPool<ChannelSftp> {
 
     public KjJsch(String host, int port, String username, String password) {
         super(new GenericObjectPool<ChannelSftp>(new BasePooledObjectFactory<ChannelSftp>() {
@@ -102,7 +102,9 @@ public class KjJsch extends KjPool<ChannelSftp, KjJsch.TYPE> {
 
     public boolean upload(String directory, String file, InputStream is) {
         try {
-            return this.execute(TYPE.UPLOAD, directory, file, is);
+            return super.execute(t -> {
+                return this.upload(t, directory, file, is);
+            });
         } catch (Exception e) {
             e.printStackTrace();
             return false;
@@ -111,7 +113,9 @@ public class KjJsch extends KjPool<ChannelSftp, KjJsch.TYPE> {
 
     public boolean download(String directory, String file, OutputStream os) {
         try {
-            return this.execute(TYPE.DOWNLOAD, directory, file, os);
+            return super.execute(t -> {
+                return this.download(t, directory, file, os);
+            });
         } catch (Exception e) {
             e.printStackTrace();
             return false;
@@ -178,24 +182,5 @@ public class KjJsch extends KjPool<ChannelSftp, KjJsch.TYPE> {
 
         }
     }
-
-    @Override
-    public Boolean execute(ChannelSftp channelSftp, TYPE type, Object... args) throws Exception {
-        String dir = (String) args[0];
-        String file = (String) args[1];
-        switch (type) {
-            case UPLOAD:
-                InputStream is = (InputStream) args[2];
-                return this.upload(channelSftp, dir, file, is);
-            case DOWNLOAD:
-            default:
-                OutputStream os = (OutputStream) args[2];
-                return this.download(channelSftp, dir, file, os);
-        }
-    }
-
-    public enum TYPE {
-        DOWNLOAD, UPLOAD;
-    }
-
+    
 }

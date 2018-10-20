@@ -3,16 +3,16 @@ package com.kj.repo.util.executor;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import com.kj.repo.base.func.Action;
+import com.kj.repo.base.func.KjAction;
 import com.kj.repo.util.base.KjExit;
 
 public class KjExecutor {
 
-    public static void run(Action action) {
+    public static void run(KjAction action) {
         try {
             action.doAction();
         } catch (Exception e) {
@@ -20,7 +20,7 @@ public class KjExecutor {
         }
     }
 
-    public static void run(Action action, Action fi) {
+    public static void run(KjAction action, KjAction fi) {
         try {
             action.doAction();
         } catch (Exception e) {
@@ -43,7 +43,7 @@ public class KjExecutor {
         }
     }
 
-    public static Thread newThread(Action action) {
+    public static Thread newThread(KjAction action) {
         Thread thread = new Thread(() -> {
             try {
                 action.doAction();
@@ -57,7 +57,7 @@ public class KjExecutor {
         return thread;
     }
 
-    public static ExecutorService newMasterWorker(Action action) {
+    public static ExecutorService newMasterWorker(KjAction action) {
         newThread(action);
         return newExecutorService();
     }
@@ -65,8 +65,14 @@ public class KjExecutor {
     public static ExecutorService newExecutorService() {
         ExecutorService service = new ThreadPoolExecutor(Runtime.getRuntime().availableProcessors() - 1,
                 Runtime.getRuntime().availableProcessors() - 1, 100, TimeUnit.SECONDS,
-                new ArrayBlockingQueue<Runnable>(40960), Executors.defaultThreadFactory(),
-                new ThreadPoolExecutor.CallerRunsPolicy());
+                new ArrayBlockingQueue<Runnable>(40960), /* Executors.defaultThreadFactory() */new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r);
+                t.setDaemon(true);
+                return t;
+            }
+        }, new ThreadPoolExecutor.CallerRunsPolicy());
         KjExit.exit(service);
         return service;
     }

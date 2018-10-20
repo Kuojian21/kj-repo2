@@ -10,7 +10,7 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 
 import com.kj.repo.bean.pool.KjPool;
 
-public class KjSignatureVerify extends KjPool<Signature, byte[]> implements KjVerify {
+public class KjSignatureVerify extends KjPool<Signature> implements KjVerify {
 
     public KjSignatureVerify(String algorithm, PublicKey publicKey) {
         super(new GenericObjectPool<>(new BasePooledObjectFactory<Signature>() {
@@ -34,15 +34,11 @@ public class KjSignatureVerify extends KjPool<Signature, byte[]> implements KjVe
         }, KjSignFactory.config()));
     }
 
-
-    @Override
-    public Boolean execute(Signature signature, byte[] bytes, Object... args) throws Exception {
-        signature.update(bytes);
-        return signature.verify((byte[]) args[0]);
-    }
-
     @Override
     public boolean verify(byte[] src, byte[] sign) throws Exception {
-        return super.execute(src, sign);
+        return super.execute(t -> {
+            t.update(src);
+            return t.verify(sign);
+        });
     }
 }

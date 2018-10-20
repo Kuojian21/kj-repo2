@@ -2,9 +2,11 @@ package com.kj.repo.bean.pool;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
 
+import com.kj.repo.base.func.KjConsumer;
+import com.kj.repo.base.func.KjFunction;
 import com.kj.repo.bean.base.KjBase;
 
-public abstract class KjPool<T, H> extends KjBase {
+public abstract class KjPool<T> extends KjBase {
 
     private final KjFactory<T> kjFactory;
 
@@ -32,11 +34,11 @@ public abstract class KjPool<T, H> extends KjBase {
         });
     }
 
-    public final <R> R execute(H h, Object... objs) throws Exception {
+    public final <R> R execute(KjFunction<T, R> function) throws Exception {
         T t = null;
         try {
             t = kjFactory.borrowObject();
-            return this.execute(t, h, objs);
+            return function.apply(t);
         } finally {
             if (t != null) {
                 kjFactory.returnObject(t);
@@ -44,6 +46,16 @@ public abstract class KjPool<T, H> extends KjBase {
         }
     }
 
-    public abstract <R> R execute(T t, H h, Object... args) throws Exception;
+    public final void execute(KjConsumer<T> consumer) throws Exception {
+        T t = null;
+        try {
+            t = kjFactory.borrowObject();
+            consumer.accept(t);
+        } finally {
+            if (t != null) {
+                kjFactory.returnObject(t);
+            }
+        }
+    }
 
 }
