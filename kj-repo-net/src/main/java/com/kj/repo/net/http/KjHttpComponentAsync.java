@@ -35,7 +35,7 @@ import org.apache.http.nio.reactor.ConnectingIOReactor;
 import org.apache.http.nio.reactor.IOReactorException;
 import org.apache.http.ssl.SSLContexts;
 
-public class KjAsyncComponent {
+public class KjHttpComponentAsync {
 
     public static final CloseableHttpAsyncClient DEFAULT;
 

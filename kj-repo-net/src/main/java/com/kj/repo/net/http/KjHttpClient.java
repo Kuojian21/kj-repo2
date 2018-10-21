@@ -32,7 +32,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-public class KjHttpFacade {
+public class KjHttpClient {
 
     public static HttpEntity newHttpEntity(List<BasicNameValuePair> list) {
         return new UrlEncodedFormEntity(list, Charset.forName("UTF-8"));
@@ -48,6 +48,8 @@ public class KjHttpFacade {
     public static RequestBody newRequestBody(String json) {
         return RequestBody.create(MediaType.parse("application/json; charset=utf-8"), json);
     }
+    
+    
 
     public static String toString(HttpEntity entity) throws ParseException, IOException {
         return EntityUtils.toString(entity, "UTF-8");
@@ -58,7 +60,7 @@ public class KjHttpFacade {
         CloseableHttpResponse response = null;
         try {
             HttpGet httpGet = new HttpGet(baseUrl);
-            response = KjSyncComponent.DEFAULT.execute(httpGet);
+            response = KjHttpComponentSync.DEFAULT.execute(httpGet);
             return func.apply(response);
         } finally {
             HttpClientUtils.closeQuietly(response);
@@ -71,7 +73,7 @@ public class KjHttpFacade {
         try {
             HttpPost httpPost = new HttpPost(baseUrl);
             httpPost.setEntity(httpEntity);
-            response = KjSyncComponent.DEFAULT.execute(httpPost);
+            response = KjHttpComponentSync.DEFAULT.execute(httpPost);
             return func.apply(response);
         } finally {
             HttpClientUtils.closeQuietly(response);
@@ -81,7 +83,7 @@ public class KjHttpFacade {
     public static Future<HttpResponse> httpAsyncGet(String baseUrl, FutureCallback<HttpResponse> callback) {
         try {
             HttpGet httpGet = new HttpGet(baseUrl);
-            return KjAsyncComponent.DEFAULT.execute(httpGet, callback);
+            return KjHttpComponentAsync.DEFAULT.execute(httpGet, callback);
         } catch (Exception e) {
             e.printStackTrace();
             return new FutureTask<HttpResponse>(new Callable<HttpResponse>() {
@@ -98,7 +100,7 @@ public class KjHttpFacade {
         try {
             HttpPost httpPost = new HttpPost(baseUrl);
             httpPost.setEntity(httpEntity);
-            return KjAsyncComponent.DEFAULT.execute(httpPost, callback);
+            return KjHttpComponentAsync.DEFAULT.execute(httpPost, callback);
         } catch (Exception e) {
             e.printStackTrace();
             return new FutureTask<HttpResponse>(new Callable<HttpResponse>() {

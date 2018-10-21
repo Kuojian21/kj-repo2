@@ -22,7 +22,7 @@ import org.apache.http.ssl.SSLContexts;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class KjSyncComponent {
+public class KjHttpComponentSync {
 
     public static final CloseableHttpClient DEFAULT;
 
