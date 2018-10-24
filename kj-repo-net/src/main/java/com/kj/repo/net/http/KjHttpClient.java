@@ -23,7 +23,7 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 
 import com.kj.repo.base.future.KjFuture;
-import com.kj.repo.util.close.KjClose;
+import com.kj.repo.util.resource.KjResource;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -119,7 +119,7 @@ public class KjHttpClient {
             response = KjOkHttp.DEFAULT.newCall(request).execute();
             return func.apply(response);
         } finally {
-            KjClose.close(response);
+            KjResource.close(response);
         }
 
     }
@@ -131,7 +131,7 @@ public class KjHttpClient {
             response = KjOkHttp.DEFAULT.newCall(request).execute();
             return func.apply(response);
         } finally {
-            KjClose.close(response);
+            KjResource.close(response);
         }
 
     }

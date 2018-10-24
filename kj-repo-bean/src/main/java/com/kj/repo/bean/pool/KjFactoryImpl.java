@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.kj.repo.util.close.KjClose;
+import com.kj.repo.util.resource.KjResource;
 
 public abstract class KjFactoryImpl<T> implements KjFactory<T> {
 
@@ -84,7 +84,7 @@ public abstract class KjFactoryImpl<T> implements KjFactory<T> {
 		T t = null;
 		while ((t = this.queue.poll()) != null) {
 			this.count.decrementAndGet();
-			KjClose.close(t);
+			KjResource.close(t);
 		}
 
 		while (this.count.get() > 0) {
@@ -95,7 +95,7 @@ public abstract class KjFactoryImpl<T> implements KjFactory<T> {
 				if (t != null) {
 					this.count.decrementAndGet();
 					this.notify.decrementAndGet();
-					KjClose.close(t);
+					KjResource.close(t);
 					continue;
 				}
 				this.cond.await(300, TimeUnit.MILLISECONDS);

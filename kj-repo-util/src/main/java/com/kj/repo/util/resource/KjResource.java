@@ -1,11 +1,11 @@
-package com.kj.repo.util.close;
+package com.kj.repo.util.resource;
 
 import java.io.Closeable;
 import java.lang.reflect.Method;
 
 import com.kj.repo.base.close.KjCloseable;
 
-public class KjClose {
+public class KjResource {
 
     public static boolean close(Object... objs) {
         return close("close", objs);

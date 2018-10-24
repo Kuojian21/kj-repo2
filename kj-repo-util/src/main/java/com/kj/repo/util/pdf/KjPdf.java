@@ -7,7 +7,7 @@ import com.itextpdf.text.Document;
 import com.itextpdf.text.PageSize;
 import com.itextpdf.text.pdf.PdfWriter;
 import com.itextpdf.tool.xml.XMLWorkerHelper;
-import com.kj.repo.util.close.KjClose;
+import com.kj.repo.util.resource.KjResource;
 
 public class KjPdf {
 
@@ -36,8 +36,8 @@ public class KjPdf {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            KjClose.close(htmlIs, cssIs);
-            KjClose.close("close", document);
+            KjResource.close(htmlIs, cssIs);
+            KjResource.close("close", document);
         }
     }
 }

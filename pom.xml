@@ -22,6 +22,7 @@
         <module>kj-repo-base</module>
         <module>kj-repo-crawler</module>
         <module>kj-repo-net</module>
+        <module>kj-repo-hystrix</module>
     </modules>
 
     <properties>
