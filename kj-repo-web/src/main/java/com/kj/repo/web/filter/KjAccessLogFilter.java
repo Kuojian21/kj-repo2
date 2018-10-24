@@ -26,7 +26,7 @@ import lombok.extern.slf4j.Slf4j;
  * @author kj
  */
 @Slf4j
-public class AccessLogFilter implements Filter {
+public class KjAccessLogFilter implements Filter {
 
 	private final Gson gson = new Gson();
 
