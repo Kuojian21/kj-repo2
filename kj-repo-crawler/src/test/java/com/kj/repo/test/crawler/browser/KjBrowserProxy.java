@@ -26,7 +26,7 @@ import com.google.common.collect.Maps;
 import com.kj.repo.browser.KjBrowser;
 import com.kj.repo.util.executor.KjExecutor;
 
-public class KjBrowserTest {
+public class KjBrowserProxy {
 
 	public static KjBrowser kjBrowser = new KjBrowser(BrowserVersion.FIREFOX_52);
 

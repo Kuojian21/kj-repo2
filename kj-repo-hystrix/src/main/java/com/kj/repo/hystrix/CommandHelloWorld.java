@@ -28,7 +28,7 @@ public class CommandHelloWorld extends HystrixCommand<String> {
 	public static void main(String[] args) {
 		System.out.println(new CommandHelloWorld("Bob").execute()); //
 		Future<String> s1 = new CommandHelloWorld("Bob").queue();
-//		Observable<String> s2 = new CommandHelloWorld("Bob").observe();
+		Observable<String> s2 = new CommandHelloWorld("Bob").observe();
 		Observable<String> s3 = new CommandHelloWorld("Bob").toObservable();
 	}
 }

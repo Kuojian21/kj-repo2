@@ -37,84 +37,89 @@ import org.apache.http.ssl.SSLContexts;
 
 public class KjHttpComponentAsync {
 
-    public static final CloseableHttpAsyncClient DEFAULT;
+	public static final CloseableHttpAsyncClient DEFAULT;
 
-    static {
-        try {
-            DEFAULT = getClient(3000, 2000, 1000, "", "", 3000, 1500, false, "", 0);
-        } catch (IOReactorException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
+	static {
+		try {
+			DEFAULT = getClient(3000, 2000, 1000, "", "", 10000, 1500, false, "", 0);
+		} catch (IOReactorException e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+	}
 
-    public static CloseableHttpAsyncClient getClient() throws IOReactorException {
-        return DEFAULT;
-    }
+	public static CloseableHttpAsyncClient getClient() throws IOReactorException {
+		return DEFAULT;
+	}
 
-    /**
-     * @param connectionRequestTimeout 从连接池获取后去连接的超时时间
-     * @param connectTimeout           连接超时
-     * @param socketTimeout            等待数据超时时间
-     * @param username
-     * @param password
-     * @param poolSize                 连接池最大连接数
-     * @param maxPerRoute              每个主机的最大并发
-     * @param proxy
-     * @param host
-     * @param port
-     * @return
-     * @throws IOReactorException
-     */
-    public static CloseableHttpAsyncClient getClient(int connectionRequestTimeout, int connectTimeout,
-                                                     int socketTimeout, String username, String password, int poolSize, int maxPerRoute, boolean proxy,
-                                                     String host, int port) throws IOReactorException {
+	/**
+	 * @param connectionRequestTimeout
+	 *            从连接池获取后去连接的超时时间
+	 * @param connectTimeout
+	 *            连接超时
+	 * @param socketTimeout
+	 *            等待数据超时时间
+	 * @param username
+	 * @param password
+	 * @param poolSize
+	 *            连接池最大连接数
+	 * @param maxPerRoute
+	 *            每个主机的最大并发
+	 * @param proxy
+	 * @param host
+	 * @param port
+	 * @return
+	 * @throws IOReactorException
+	 */
+	public static CloseableHttpAsyncClient getClient(int connectionRequestTimeout, int connectTimeout,
+			int socketTimeout, String username, String password, int poolSize, int maxPerRoute, boolean proxy,
+			String host, int port) throws IOReactorException {
 
-        RequestConfig requestConfig = RequestConfig.custom().setConnectionRequestTimeout(connectionRequestTimeout)
-                .setConnectTimeout(connectTimeout).setSocketTimeout(socketTimeout).build();
+		RequestConfig requestConfig = RequestConfig.custom().setConnectionRequestTimeout(connectionRequestTimeout)
+				.setConnectTimeout(connectTimeout).setSocketTimeout(socketTimeout).build();
 
-        UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(username, password);
-        CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-        credentialsProvider.setCredentials(AuthScope.ANY, credentials);
+		UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(username, password);
+		CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+		credentialsProvider.setCredentials(AuthScope.ANY, credentials);
 
-        // 设置协议http和https对应的处理socket链接工厂的对象
-        SSLContext sslcontext = SSLContexts.createDefault();
-        Registry<SchemeIOSessionStrategy> sessionStrategyRegistry = RegistryBuilder.<SchemeIOSessionStrategy>create()
-                .register("http", NoopIOSessionStrategy.INSTANCE)
-                .register("https", new SSLIOSessionStrategy(sslcontext)).build();
+		// 设置协议http和https对应的处理socket链接工厂的对象
+		SSLContext sslcontext = SSLContexts.createDefault();
+		Registry<SchemeIOSessionStrategy> sessionStrategyRegistry = RegistryBuilder.<SchemeIOSessionStrategy>create()
+				.register("http", NoopIOSessionStrategy.INSTANCE)
+				.register("https", new SSLIOSessionStrategy(sslcontext)).build();
 
-        // 配置io线程
-        IOReactorConfig ioReactorConfig = IOReactorConfig.custom().setSoKeepAlive(false).setTcpNoDelay(true)
-                .setIoThreadCount(Runtime.getRuntime().availableProcessors()).build();
-        // 设置连接池大小
-        ConnectingIOReactor ioReactor = new DefaultConnectingIOReactor(ioReactorConfig);
-        PoolingNHttpClientConnectionManager conMgr = new PoolingNHttpClientConnectionManager(ioReactor,
-                sessionStrategyRegistry);
-        conMgr.setMaxTotal(poolSize);
-        conMgr.setDefaultMaxPerRoute(maxPerRoute);
-        ConnectionConfig connectionConfig = ConnectionConfig.custom().setMalformedInputAction(CodingErrorAction.IGNORE)
-                .setUnmappableInputAction(CodingErrorAction.IGNORE).setCharset(Consts.UTF_8).build();
-        Lookup<AuthSchemeProvider> authSchemeRegistry = RegistryBuilder.<AuthSchemeProvider>create()
-                .register(AuthSchemes.BASIC, new BasicSchemeFactory())
-                .register(AuthSchemes.DIGEST, new DigestSchemeFactory())
-                .register(AuthSchemes.NTLM, new NTLMSchemeFactory())
-                .register(AuthSchemes.SPNEGO, new SPNegoSchemeFactory())
-                .register(AuthSchemes.KERBEROS, new KerberosSchemeFactory()).build();
-        conMgr.setDefaultConnectionConfig(connectionConfig);
+		// 配置io线程
+		IOReactorConfig ioReactorConfig = IOReactorConfig.custom().setSoKeepAlive(false).setTcpNoDelay(true)
+				.setIoThreadCount(Runtime.getRuntime().availableProcessors()).build();
+		// 设置连接池大小
+		ConnectingIOReactor ioReactor = new DefaultConnectingIOReactor(ioReactorConfig);
+		PoolingNHttpClientConnectionManager conMgr = new PoolingNHttpClientConnectionManager(ioReactor,
+				sessionStrategyRegistry);
+		conMgr.setMaxTotal(poolSize);
+		conMgr.setDefaultMaxPerRoute(maxPerRoute);
+		ConnectionConfig connectionConfig = ConnectionConfig.custom().setMalformedInputAction(CodingErrorAction.IGNORE)
+				.setUnmappableInputAction(CodingErrorAction.IGNORE).setCharset(Consts.UTF_8).build();
+		Lookup<AuthSchemeProvider> authSchemeRegistry = RegistryBuilder.<AuthSchemeProvider>create()
+				.register(AuthSchemes.BASIC, new BasicSchemeFactory())
+				.register(AuthSchemes.DIGEST, new DigestSchemeFactory())
+				.register(AuthSchemes.NTLM, new NTLMSchemeFactory())
+				.register(AuthSchemes.SPNEGO, new SPNegoSchemeFactory())
+				.register(AuthSchemes.KERBEROS, new KerberosSchemeFactory()).build();
+		conMgr.setDefaultConnectionConfig(connectionConfig);
 
-        CloseableHttpAsyncClient client = null;
-        if (proxy) {
-            client = HttpAsyncClients.custom().setConnectionManager(conMgr)
-                    .setDefaultCredentialsProvider(credentialsProvider).setDefaultAuthSchemeRegistry(authSchemeRegistry)
-                    .setProxy(new HttpHost(host, port)).setDefaultCookieStore(new BasicCookieStore())
-                    .setDefaultRequestConfig(requestConfig).build();
-        } else {
-            client = HttpAsyncClients.custom().setConnectionManager(conMgr)
-                    .setDefaultCredentialsProvider(credentialsProvider).setDefaultAuthSchemeRegistry(authSchemeRegistry)
-                    .setDefaultCookieStore(new BasicCookieStore()).build();
-        }
-        client.start();
-        return client;
-    }
+		CloseableHttpAsyncClient client = null;
+		if (proxy) {
+			client = HttpAsyncClients.custom().setConnectionManager(conMgr)
+					.setDefaultCredentialsProvider(credentialsProvider).setDefaultAuthSchemeRegistry(authSchemeRegistry)
+					.setProxy(new HttpHost(host, port)).setDefaultCookieStore(new BasicCookieStore())
+					.setDefaultRequestConfig(requestConfig).build();
+		} else {
+			client = HttpAsyncClients.custom().setConnectionManager(conMgr)
+					.setDefaultCredentialsProvider(credentialsProvider).setDefaultAuthSchemeRegistry(authSchemeRegistry)
+					.setDefaultCookieStore(new BasicCookieStore()).build();
+		}
+		client.start();
+		return client;
+	}
 
 }
