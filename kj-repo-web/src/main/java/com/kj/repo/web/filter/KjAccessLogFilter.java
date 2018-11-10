@@ -41,7 +41,8 @@ public class KjAccessLogFilter implements Filter {
 		String contentType = request.getContentType();
 		HttpServletRequest req = (HttpServletRequest) request;
 		if (Strings.isNullOrEmpty(contentType) || contentType.indexOf("application/json") < 0) {
-			log.info(this.getClass().getName() + ":{}:{}", req.getRequestURI(), gson.toJson(request.getParameterMap()));
+			log.info(this.getClass().getName() + ":{}:{}", req.getRequestURI(), 
+					gson.toJson(request.getParameterMap()));
 		} else {
 			AccessLogServletRequestWrapper requestWrapper = new AccessLogServletRequestWrapper(req);
 			StringBuilder json = new StringBuilder();

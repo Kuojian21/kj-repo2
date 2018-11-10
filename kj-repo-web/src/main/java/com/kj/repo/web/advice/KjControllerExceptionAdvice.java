@@ -23,6 +23,9 @@ public class KjControllerExceptionAdvice {
     @ExceptionHandler(Throwable.class)
     @ResponseStatus(HttpStatus.OK)
     public ResultInfo<Void> handleException(HttpServletRequest request, Throwable t) {
+//    	if(t instanceof ClientAbortException) {
+//    		
+//    	}
         log.info("", t);
         return ResultInfo.fail("exception");
     }
