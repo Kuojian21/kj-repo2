@@ -30,8 +30,8 @@ public class B {
 		return "test";
 	}
 
-	private static String myTest(Object obj) {
-		System.out.println("B.myTest() 2");
-		return "test";
-	}
+	// private static String myTest(Object obj) {
+	// System.out.println("B.myTest() 2");
+	// return "test";
+	// }
 }
