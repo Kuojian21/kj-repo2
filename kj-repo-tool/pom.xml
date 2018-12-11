@@ -13,7 +13,7 @@
     <dependencies>
         <dependency>
             <groupId>com.kj.repo</groupId>
-            <artifactId>kj-repo-dao</artifactId>
+            <artifactId>kj-repo-saver</artifactId>
         </dependency>
     </dependencies>
 

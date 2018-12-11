@@ -9,7 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>kj-repo-dao</artifactId>
+    <artifactId>kj-repo-saver</artifactId>
 
     <dependencies>
         <!-- https://mvnrepository.com/artifact/org.springframework/spring-jdbc -->
