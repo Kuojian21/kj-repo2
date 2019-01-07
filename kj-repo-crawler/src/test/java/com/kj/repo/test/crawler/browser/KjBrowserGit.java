@@ -18,14 +18,14 @@ public class KjBrowserGit {
 		// System.setProperty("socksProxyHost", "127.0.0.1");
 		// System.setProperty("socksProxyPort", "8088");
 		kjBrowser.execute(t -> {
-			t.addCookie("_ga=GA1.2.1718180206.1536158386", new URL(args[0]), null);
+			t.addCookie("_ga=GA1.2.1465489996.1545289282", new URL(args[0]), null);
+			t.addCookie("_gid=GA1.2.80586127.1546051065", new URL(args[0]), null);
+			t.addCookie("_gitlab_session=751d7df9fc92157435011e16429abb84", new URL(args[0]), null);
+			t.addCookie("ticket=ST-42393-wFjdSSIbAjrLPrpY5gHOmq-e9q0-kssso", new URL(args[0]), null);
+			
 			t.addCookie("sidebar_collapsed=false", new URL(args[0]), null);
-			t.addCookie("_biz_uid=9851a66153334d0cca6223edab1f0b24", new URL(args[0]), null);
-			t.addCookie("_biz_nA=25", new URL(args[0]), null);
+			t.addCookie("_biz_nA=2", new URL(args[0]), null);
 			t.addCookie("_biz_pendingA=%5B%5D", new URL(args[0]), null);
-			t.addCookie("Hm_lvt_86a27b7db2c5c0ae37fee4a8a35033ee=1538699602", new URL(args[0]), null);
-			t.addCookie("_gitlab_session=eb0c241843ce922c4beab0c22ace9e1c", new URL(args[0]), null);
-
 			HtmlPage page = t.getPage(args[0]);
 			System.out.println(page.asXml());
 			List<String> all = parse(page);

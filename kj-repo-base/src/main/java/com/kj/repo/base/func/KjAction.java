@@ -2,6 +2,9 @@ package com.kj.repo.base.func;
 
 import java.util.Objects;
 
+/**
+ * @author kj
+ */
 @FunctionalInterface
 public interface KjAction {
 

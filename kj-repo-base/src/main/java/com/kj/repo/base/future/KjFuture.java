@@ -2,6 +2,9 @@ package com.kj.repo.base.future;
 
 import java.util.concurrent.FutureTask;
 
+/**
+ * @author kj
+ */
 public class KjFuture<T> extends FutureTask<T> {
 
     public KjFuture() {

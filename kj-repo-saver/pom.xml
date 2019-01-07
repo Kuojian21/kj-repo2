@@ -12,6 +12,10 @@
     <artifactId>kj-repo-saver</artifactId>
 
     <dependencies>
+        <dependency>
+            <groupId>com.kj.repo</groupId>
+            <artifactId>kj-repo-base</artifactId>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.springframework/spring-jdbc -->
         <dependency>
             <groupId>org.springframework</groupId>
