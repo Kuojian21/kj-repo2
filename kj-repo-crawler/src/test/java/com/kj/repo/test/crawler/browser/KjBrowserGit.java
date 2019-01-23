@@ -20,7 +20,7 @@ public class KjBrowserGit {
 		kjBrowser.execute(t -> {
 			t.addCookie("_ga=GA1.2.1465489996.1545289282", new URL(args[0]), null);
 			t.addCookie("_gid=GA1.2.80586127.1546051065", new URL(args[0]), null);
-			t.addCookie("_gitlab_session=751d7df9fc92157435011e16429abb84", new URL(args[0]), null);
+			t.addCookie("_gitlab_session=d9e0fd41d26db5e581ab3ed4cbc18db6", new URL(args[0]), null);
 			t.addCookie("ticket=ST-42393-wFjdSSIbAjrLPrpY5gHOmq-e9q0-kssso", new URL(args[0]), null);
 			
 			t.addCookie("sidebar_collapsed=false", new URL(args[0]), null);

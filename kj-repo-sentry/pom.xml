@@ -9,22 +9,26 @@
 		<artifactId>kj-repo</artifactId>
 		<version>1.0-SNAPSHOT</version>
 	</parent>
-	<artifactId>kj-repo-rxjava</artifactId>
-	<name>kj-repo-rxjava</name>
+	<artifactId>kj-repo-sentry</artifactId>
+	<name>kj-repo-sentry</name>
 	<url>http://maven.apache.org</url>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 	<dependencies>
+
+		<!-- https://mvnrepository.com/artifact/io.sentry/sentry -->
 		<dependency>
-			<groupId>com.kj.repo</groupId>
-			<artifactId>kj-repo-bean</artifactId>
+			<groupId>io.sentry</groupId>
+			<artifactId>sentry</artifactId>
+			<version>1.7.17</version>
 		</dependency>
-		<!-- https://mvnrepository.com/artifact/io.reactivex/rxjava -->
+		<!-- https://mvnrepository.com/artifact/io.sentry/sentry-logback -->
 		<dependency>
-			<groupId>io.reactivex</groupId>
-			<artifactId>rxjava</artifactId>
-			<version>1.3.8</version>
+			<groupId>io.sentry</groupId>
+			<artifactId>sentry-logback</artifactId>
+			<version>1.7.17</version>
 		</dependency>
+
 	</dependencies>
 </project>

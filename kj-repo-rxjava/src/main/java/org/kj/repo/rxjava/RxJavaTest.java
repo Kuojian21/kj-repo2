@@ -10,6 +10,7 @@ import lombok.Data;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscriber;
+import rx.Subscription;
 import rx.Observable.OnSubscribe;
 import rx.observables.GroupedObservable;
 import rx.schedulers.Schedulers;
@@ -187,7 +188,7 @@ public class RxJavaTest {
 
 	public static void debounce() throws InterruptedException {
 		Observer<Object> observer = observer();
-		Observable.create(t -> {
+		Subscription subscribe = Observable.create(t -> {
 			subscriber = t;
 		}).debounce(3, TimeUnit.SECONDS, Schedulers.from(Executors.newFixedThreadPool(15))).subscribe(observer);
 		subscriber.onNext("1");
@@ -202,6 +203,10 @@ public class RxJavaTest {
 	public static void when() {
 		Observer<Integer> observer = observer();
 		Observable.from(Lists.newArrayList(3, 6, 8)).subscribe(observer);
+	}
+
+	public static void switc() {
+//		Observable.from(Lists.newArrayList(3, 6, 8)).switchMap(func);
 	}
 
 	public static void main(String[] args) throws InterruptedException {
