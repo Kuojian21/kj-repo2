@@ -23,7 +23,6 @@
 		<module>kj-repo-crawler</module>
 		<module>kj-repo-net</module>
 		<module>kj-repo-hystrix</module>
-		<module>kj-repo-btrace</module>
 		<module>kj-repo-shyiko</module>
 		<module>kj-repo-algorithm</module>
 		<module>kj-repo-curator</module>
@@ -31,6 +30,8 @@
 		<module>kj-repo-cron</module>
 		<module>kj-repo-rxjava</module>
 		<module>kj-repo-sentry</module>
+
+		<module>kj-repo-json</module>
 	</modules>
 
 	<properties>
@@ -143,23 +144,11 @@
 					<testTarget>${java.version}</testTarget>
 				</configuration>
 			</plugin>
-			<!-- <plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-dependency-plugin</artifactId>
-				<version>2.10</version>
-				<executions>
-					<execution>
-						<id>copy-dependencies</id>
-						<phase>package</phase>
-						<goals>
-							<goal>copy-dependencies</goal>
-						</goals>
-						<configuration>
-							<outputDirectory>${project.build.directory}/lib</outputDirectory>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin> -->
+			<!-- <plugin> <groupId>org.apache.maven.plugins</groupId> <artifactId>maven-dependency-plugin</artifactId> 
+				<version>2.10</version> <executions> <execution> <id>copy-dependencies</id> 
+				<phase>package</phase> <goals> <goal>copy-dependencies</goal> </goals> <configuration> 
+				<outputDirectory>${project.build.directory}/lib</outputDirectory> </configuration> 
+				</execution> </executions> </plugin> -->
 		</plugins>
 	</build>
 </project>
