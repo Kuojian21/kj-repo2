@@ -1,0 +1,113 @@
+package com.kj.infra.pool;
+
+import java.io.Closeable;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+import org.apache.commons.pool2.BasePooledObjectFactory;
+import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.impl.DefaultPooledObject;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+
+import net.sf.cglib.proxy.Enhancer;
+import net.sf.cglib.proxy.MethodInterceptor;
+import net.sf.cglib.proxy.MethodProxy;
+import redis.clients.util.Pool;
+
+public class KjJedis<T> {
+
+	private final GenericObjectPool<T> pool;
+
+	public KjJedis(final GenericObjectPool<T> pool) {
+		this.pool = pool;
+	}
+
+	public final <R> R execute(Function<T, R> function) throws Exception {
+		T t = null;
+		try {
+			t = this.pool.borrowObject();
+			return function.apply(t);
+		} finally {
+			if (t != null) {
+				this.pool.returnObject(t);
+			}
+		}
+	}
+
+	public final void execute(Consumer<T> consumer) throws Exception {
+		T t = null;
+		try {
+			t = this.pool.borrowObject();
+			consumer.accept(t);
+		} finally {
+			if (t != null) {
+				this.pool.returnObject(t);
+			}
+		}
+	}
+
+	public static class Jedis {
+		public static <T extends Closeable> KjJedis<T> jedis(Pool<T> pool) {
+			return new KjJedis<T>(new GenericObjectPool<T>(new BasePooledObjectFactory<T>() {
+				@Override
+				public T create() throws Exception {
+					return pool.getResource();
+				}
+
+				@Override
+				public PooledObject<T> wrap(T obj) {
+					return new DefaultPooledObject<T>(obj);
+				}
+
+				@Override
+				public void destroyObject(final PooledObject<T> obj)
+								throws Exception {
+					obj.getObject().close();
+				}
+			}) {
+				@Override
+				public void close() {
+					pool.close();
+					super.close();
+				}
+			});
+		}
+
+		public static <T extends Closeable> T jedis(Pool<T> pool, Class<T> clazz) {
+			KjJedis<T> jedis = jedis(pool);
+			return Helper.enhancer(clazz, (method, args) -> {
+				try {
+					return jedis.execute(f -> {
+						try {
+							return method.invoke(f, args);
+						} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+							throw new RuntimeException(e);
+						}
+					});
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			});
+		}
+	}
+
+	public static class Helper {
+
+		@SuppressWarnings("unchecked")
+		public static <T> T enhancer(Class<T> clazz, BiFunction<Method, Object[], Object> func) {
+			Enhancer enhancer = new Enhancer();
+			enhancer.setSuperclass(clazz);
+			enhancer.setCallback(new MethodInterceptor() {
+				@Override
+				public Object intercept(Object obj, Method method, Object[] args, MethodProxy proxy) throws Throwable {
+					return func.apply(method, args);
+				}
+			});
+			return (T) enhancer.create();
+		}
+	}
+
+}
