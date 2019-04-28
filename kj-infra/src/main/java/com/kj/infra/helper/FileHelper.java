@@ -4,7 +4,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
-
+/**
+ * 
+ * @author kuojian21
+ *
+ */
 public class FileHelper {
 
 	public static byte[] readBytes(String path, String... file) throws IOException {

@@ -297,13 +297,15 @@ public abstract class Savor<T> {
 															.collect(Collectors.toList())))
 							.append(")\n ")
 							.append("  on duplicate key update ")
-							.append(Joiner.on(",").join(exprs));
+							.append(Joiner.on(",").join(
+											Lists.newArrayList(exprs).stream().sorted().collect(Collectors.toList())));
 			Map<String, Object> params = Maps.newHashMap();
 			return SqlParams.model(sql, params);
 		}
 
 		public static SqlParams delete(Model model, String table, Map<String, Object> params) {
 			StringBuilder sql = new StringBuilder();
+			params = Maps.newHashMap(params);
 			sql.append("delete from ")
 							.append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
 							.append("\n")
@@ -314,7 +316,12 @@ public abstract class Savor<T> {
 		public static SqlParams update(Model model, String table, Map<String, Object> newValues,
 						Map<String, Object> params) {
 			StringBuilder sql = new StringBuilder();
-			params = Maps.newHashMap(params);
+			newValues = Maps.newHashMap(newValues);
+			if (params == null) {
+				params = Maps.newHashMap();
+			} else {
+				params = Maps.newHashMap(params);
+			}
 			sql.append("update ")
 							.append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
 							.append("\n")
@@ -355,12 +362,17 @@ public abstract class Savor<T> {
 
 		public static SqlParams select(Model model, String table, List<String> names,
 						Map<String, Object> params, List<String> orderExprs, Integer offset, Integer limit) {
+			if (params == null) {
+				params = Maps.newHashMap();
+			} else {
+				params = Maps.newHashMap(params);
+			}
 			StringBuilder sql = new StringBuilder();
 			sql.append("select ");
 			if (names == null || names.isEmpty()) {
 				sql.append("*");
 			} else {
-				sql.append(Joiner.on(",").join(names.stream().map(n -> {
+				sql.append(Joiner.on(",").join(Lists.newArrayList(names).stream().sorted().map(n -> {
 					Property property = model.getProperty(n);
 					if (property == null) {
 						return n;
@@ -450,7 +462,8 @@ public abstract class Savor<T> {
 			this.insertProperties = Collections
 							.unmodifiableList(
 											properties.stream().filter(p -> p.isInsert()).collect(Collectors.toList()));
-			this.tableProperties = this.getProperties(tableKeys);
+			this.tableProperties = Collections
+							.unmodifiableList(this.getProperties(tableKeys));
 		}
 
 		@SuppressWarnings("checkstyle:HiddenField")
@@ -543,15 +556,19 @@ public abstract class Savor<T> {
 	 */
 	@Data
 	public static class SqlParams {
-		private StringBuilder sql;
-		private Map<String, Object> params;
+		private final StringBuilder sql;
+		private final Map<String, Object> params;
+
+		public SqlParams(StringBuilder sql, Map<String, Object> params) {
+			super();
+			this.sql = sql;
+			this.params = params;
+		}
 
 		public static SqlParams model(StringBuilder sql, Map<String, Object> params) {
-			SqlParams model = new SqlParams();
-			model.sql = sql;
-			model.params = params;
-			return model;
+			return new SqlParams(sql, params);
 		}
+
 	}
 
 }

@@ -36,6 +36,13 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
+/**
+ * 
+ * @author kuojian21
+ *
+ * @param <T>
+ * @param <R>
+ */
 public abstract class KjCrypt<T, R> {
 
 	private final GenericObjectPool<T> pool;
@@ -62,6 +69,11 @@ public abstract class KjCrypt<T, R> {
 
 	public abstract BiFunction<T, byte[], R> func();
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class KjCipher {
 
 		public static KjCrypt<Cipher, byte[]> encrypt(String algorithm, Key key, IvParameterSpec ivp) {
@@ -109,6 +121,11 @@ public abstract class KjCrypt<T, R> {
 
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class KjMessageDigest {
 		public static KjCrypt<MessageDigest, byte[]> digest(String algorithm) {
 			return new KjCrypt<MessageDigest, byte[]>(
@@ -132,6 +149,11 @@ public abstract class KjCrypt<T, R> {
 		}
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class KjMac {
 		public static KjCrypt<Mac, byte[]> mac(String algorithm, SecretKey key) {
 			return new KjCrypt<Mac, byte[]>(new GenericObjectPool<Mac>(new BasePooledObjectFactory<Mac>() {
@@ -157,6 +179,11 @@ public abstract class KjCrypt<T, R> {
 		}
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class KjSignature {
 		public static KjCrypt<Signature, byte[]> sign(String algorithm, PrivateKey privateKey) {
 			return new KjCrypt<Signature, byte[]>(
@@ -204,6 +231,11 @@ public abstract class KjCrypt<T, R> {
 
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class Factory {
 
 		static {
@@ -255,6 +287,11 @@ public abstract class KjCrypt<T, R> {
 
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class Helper {
 		public static byte[] cipher(Cipher cipher, byte[] data) {
 			try {
@@ -290,6 +327,11 @@ public abstract class KjCrypt<T, R> {
 		}
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class Algorithm {
 		public enum Mac {
 			HmacMD5, HmacSHA1, HmacSHA256;

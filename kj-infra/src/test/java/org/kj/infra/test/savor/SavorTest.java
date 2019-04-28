@@ -24,6 +24,10 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class SavorTest {
 
+	public static void main(String[] args) throws SQLException {
+		test(args);
+	}
+
 	/**
 	 * create table savor_base_test( id bigint(20) unsigned not null primary key
 	 * comment '自增主键', hash_key varchar(64) comment 'key', value varchar(128)
@@ -61,7 +65,7 @@ public class SavorTest {
 	public static void test(String[] args) throws SQLException {
 		SavorBaseTestDao dao = new SavorBaseTestDao(
 						new SimpleDriverDataSource(new Driver(), args[0], args[1], args[2]));
-		LongStream.range(0, 110).boxed().forEach(i -> {
+		LongStream.range(0, 10).boxed().forEach(i -> {
 			log.info("{}", dao.insert(LongStream.range(0, 10).boxed().map(j -> {
 				SavorBaseTest test = new SavorBaseTest();
 				test.setId(i * 10 + j);

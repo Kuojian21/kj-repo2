@@ -18,6 +18,12 @@ import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 import com.jcraft.jsch.SftpException;
 
+/**
+ * 
+ * @author kuojian21
+ *
+ * @param <T>
+ */
 public class KjJsch<T> {
 
 	private final GenericObjectPool<T> pool;
@@ -50,6 +56,11 @@ public class KjJsch<T> {
 		}
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class Jsch {
 		public static KjJsch<ChannelSftp> jsch(String host, int port, String username, String password) {
 			return new KjJsch<ChannelSftp>(
@@ -115,6 +126,11 @@ public class KjJsch<T> {
 		}
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class Helper {
 
 		public static boolean upload(ChannelSftp sftp, String directory, String file, InputStream is)

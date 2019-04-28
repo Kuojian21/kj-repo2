@@ -17,6 +17,12 @@ import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
 import redis.clients.util.Pool;
 
+/**
+ * 
+ * @author kuojian21
+ *
+ * @param <T>
+ */
 public class KjJedis<T> {
 
 	private final GenericObjectPool<T> pool;
@@ -49,6 +55,11 @@ public class KjJedis<T> {
 		}
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class Jedis {
 		public static <T extends Closeable> KjJedis<T> jedis(Pool<T> pool) {
 			return new KjJedis<T>(new GenericObjectPool<T>(new BasePooledObjectFactory<T>() {
@@ -94,6 +105,11 @@ public class KjJedis<T> {
 		}
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class Helper {
 
 		@SuppressWarnings("unchecked")

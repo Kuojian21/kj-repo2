@@ -88,6 +88,11 @@ public class KjBrowser<T> {
 		}));
 	}
 
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
 	public static class Helper {
 		public static <T> List<String> parseText(HtmlPage page, String xpath) {
 			List<String> result = Lists.newArrayList();
