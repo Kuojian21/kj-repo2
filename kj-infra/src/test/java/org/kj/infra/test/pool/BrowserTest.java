@@ -24,8 +24,6 @@ public class BrowserTest {
 			try {
 				t.addCookie("_did=web_966972270286159", domain, null);
 				t.addCookie("_gitlab_session=d44e489f50cd9710f4a014130ca79f17", domain, null);
-				t.addCookie("adm_tk=UuurUbV49MebcJCjA15Fif8OVICxxw0u-983795515", domain, null);
-				t.addCookie("kwai_adm_tk=UuurUbV49MebcJCjA15Fif8OVICxxw0u-983795515", domain, null);
 				t.addCookie("sidebar_collapsed=false", domain, null);
 				HtmlPage page = t.getPage(args[0]);
 				List<String> all = KjBrowser.Helper.parseURL(page, "//a[@class='project']/@href");
