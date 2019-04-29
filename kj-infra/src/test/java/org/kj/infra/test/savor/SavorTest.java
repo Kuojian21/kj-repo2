@@ -1,6 +1,7 @@
 package org.kj.infra.test.savor;
 
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -15,7 +16,8 @@ import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
 import com.kj.infra.savor.Savor;
 import com.kj.infra.savor.SavorHelper;
-import com.kj.infra.savor.Savor.PrimaryKey;
+import com.kj.infra.savor.Savor.TimeInsert;
+import com.kj.infra.savor.Savor.TimeUpdate;
 import com.mysql.cj.jdbc.Driver;
 
 import lombok.Data;
@@ -26,6 +28,15 @@ public class SavorTest {
 
 	public static void main(String[] args) throws SQLException {
 		test(args);
+	}
+
+	public static void testSet(String[] args) {
+		Map<String, Object> map = Savor.Helper.newHashMap("sss", null);
+
+		System.out.println(map.entrySet().stream().map(Map.Entry::getValue)
+						.collect(Collectors.toList()));
+		map.entrySet().stream()
+						.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 	}
 
 	public static void code(String[] args) throws SQLException {
@@ -70,15 +81,20 @@ public class SavorTest {
 	public static void test(String[] args) throws SQLException {
 		SavorBaseTestDao dao = new SavorBaseTestDao(
 						new SimpleDriverDataSource(new Driver(), args[0], args[1], args[2]));
+		/**
+		 * test insert def
+		 */
 		LongStream.range(0, 10).boxed().forEach(i -> {
 			log.info("{}", dao.insert(LongStream.range(0, 10).boxed().map(j -> {
 				SavorBaseTest test = new SavorBaseTest();
-				test.setId(i * 10 + j);
-				test.setCreateTime(System.currentTimeMillis());
-				test.setUpdateTime(System.currentTimeMillis());
+				test.setId(i * 10 + j + 1);
 				return test;
 			}).collect(Collectors.toList())));
 		});
+
+		/**
+		 * test delete
+		 */
 		dao.delete(Savor.Helper.newHashMap("id", 1));
 		IntStream.range(0, 10).boxed()
 						.forEach(i -> dao.update(Savor.Helper.newHashMap("name", "kj"),
@@ -116,7 +132,7 @@ public class SavorTest {
 	@Data
 	public static class SavorBaseTest {
 		/* 自增主键 */
-		@PrimaryKey(insert = true)
+		@Savor.PrimaryKey(insert = true)
 		private Long id;
 		/* key */
 		private String hashKey;
@@ -129,9 +145,11 @@ public class SavorTest {
 		/* age */
 		private Integer age;
 		/* 创建时间 */
+		@TimeInsert(value = "timestamp")
 		private Long createTime;
 		/* 创建时间 */
-		private Long updateTime;
+		@TimeUpdate(value = "timestamp")
+		private java.sql.Timestamp updateTime;
 
 		@Override
 		public String toString() {

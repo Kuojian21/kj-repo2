@@ -4,13 +4,18 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
 import com.google.common.base.CaseFormat;
+import com.google.common.base.Strings;
 
 import lombok.Data;
 
@@ -21,38 +26,26 @@ import lombok.Data;
  */
 public class SavorHelper {
 
+	public static final Logger logger = LoggerFactory.getLogger(SavorHelper.class);
+
 	public static RowMapper<Property> rowMapper = new RowMapper<Property>() {
 		@Override
 		public Property mapRow(ResultSet rs, int rowNum) throws SQLException {
-			String type = "";
-			if (rs.getString("Type").startsWith("tinyint")
-							|| rs.getString("Type").startsWith("int")) {
-				type = "Integer";
-			} else if (rs.getString("Type").startsWith("bigint")) {
-				type = "Long";
-			} else if (rs.getString("Type").startsWith("varchar")
-							|| rs.getString("Type").endsWith("text")
-							|| rs.getString("Type").equals("json")) {
-				type = "String";
-			}
-			return new Property(
-							CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL,
-											rs.getString("Field")),
-							rs.getString("Field"),
-							type,
-							"PRI".equals(rs.getString("Key")),
-							"auto_increment".equals(rs.getString("Extra")),
-							rs.getString("Comment"));
+			return new Property(rs);
 		}
 	};
 
 	public static Model mysql(DataSource dataSource, String table) {
 		List<Property> properties = new JdbcTemplate(dataSource)
 						.query("show full columns from " + table, rowMapper);
-		return new Model(CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, table), table, properties);
+		return new Model(table, properties);
 	}
 
 	public static void code(Model model) {
+		for (String str : model.imports) {
+			System.out.println("import " + str + ";");
+		}
+
 		System.out.println("/**");
 		System.out.println(" * @author kj");
 		System.out.println(" */");
@@ -81,12 +74,16 @@ public class SavorHelper {
 		private final String name;
 		private final String table;
 		private final List<Property> properties;
+		private final Set<String> imports;
 
-		public Model(String name, String table, List<Property> properties) {
+		public Model(String table, List<Property> properties) {
 			super();
-			this.name = name;
+			this.name = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, table);
 			this.table = table;
 			this.properties = properties;
+			this.imports = properties.stream().filter(p -> !Strings.isNullOrEmpty(p.getFullType()))
+							.map(Property::getFullType).distinct()
+							.collect(Collectors.toSet());
 		}
 
 	}
@@ -102,18 +99,41 @@ public class SavorHelper {
 		private final String name;
 		private final String column;
 		private final String type;
+		private final String fullType;
 		private final boolean primaryKey;
 		private final boolean insert;
 		private final String comment;
 
-		public Property(String name, String column, String type, boolean primaryKey, boolean insert, String comment) {
+		public Property(ResultSet rs) throws SQLException {
 			super();
-			this.name = name;
-			this.column = column;
-			this.type = type;
-			this.primaryKey = primaryKey;
-			this.insert = insert;
-			this.comment = comment;
+			this.column = rs.getString("Field");
+			this.name = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, column);
+			String dbType = rs.getString("Type");
+			if (dbType.startsWith("tinyint")
+							|| dbType.startsWith("int")) {
+				this.type = "Integer";
+			} else if (dbType.startsWith("bigint")) {
+				this.type = "Long";
+			} else if (dbType.startsWith("varchar")
+							|| dbType.endsWith("text")
+							|| dbType.equals("json")) {
+				this.type = "String";
+			} else if (dbType.equals("timestamp")) {
+				this.type = "java.sql.Timestamp";
+			} else if (dbType.equals("date")) {
+				this.type = "java.sql.Date";
+			} else {
+				this.type = "";
+			}
+//			if (dbType.equals("timestamp")) {
+//				this.fullType = "java.sql.TimeStamp";
+//			} else if(dbType.equals("date")){
+//				this.fullType = "java.sql.Date";
+//			}
+			this.fullType = "";
+			this.primaryKey = "PRI".equals(rs.getString("Key"));
+			this.insert = !"auto_increment".equals(rs.getString("Extra"));
+			this.comment = rs.getString("Comment");
 		}
 
 	}

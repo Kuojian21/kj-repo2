@@ -176,7 +176,7 @@ public abstract class Savor<T> {
 		}
 
 		static Supplier<Object> insertDef(Field f) {
-			InsertDef inDef = f.getAnnotation(InsertDef.class);
+			TimeInsert inDef = f.getAnnotation(TimeInsert.class);
 			if (inDef != null) {
 				return parseDef(f.getType(), inDef.value());
 			} else {
@@ -185,29 +185,17 @@ public abstract class Savor<T> {
 		}
 
 		static Supplier<Object> updateDef(Field f) {
-			UpdateDef upDef = f.getAnnotation(UpdateDef.class);
+			TimeUpdate upDef = f.getAnnotation(TimeUpdate.class);
 			if (upDef != null) {
-				return parseDef(f.getClass(), upDef.value());
+				return parseDef(f.getType(), upDef.value());
 			} else {
 				return () -> null;
 			}
 		}
 
 		static Supplier<Object> parseDef(Class<?> type, String value) {
-			if (Strings.isNullOrEmpty(value)) {
-				return () -> null;
-			}
-			Object val = null;
 			if (Long.class.equals(type)) {
-				if ("TIMESTAMP".equals(value.toUpperCase())) {
-					return System::currentTimeMillis;
-				} else {
-					val = Long.parseLong(value);
-				}
-			} else if (Integer.class.equals(type)) {
-				val = Integer.parseInt(value);
-			} else if (String.class.equals(type)) {
-				val = value;
+				return System::currentTimeMillis;
 			} else if (Date.class.equals(type)) {
 				return () -> {
 					return new Date(System.currentTimeMillis());
@@ -217,8 +205,7 @@ public abstract class Savor<T> {
 					return new Timestamp(System.currentTimeMillis());
 				};
 			}
-			Object def = val;
-			return () -> def;
+			return () -> null;
 		}
 
 	}
@@ -284,12 +271,12 @@ public abstract class Savor<T> {
 		}
 
 		public static <T> SqlParams upsert(Model model, String table, T obj, List<String> exprs) {
-			if ((exprs == null || exprs.isEmpty()) && model.getUpdateDefProperties().isEmpty()) {
+			if ((exprs == null || exprs.isEmpty()) && model.getUpdateTimeProperties().isEmpty()) {
 				return insert(model, table, Lists.newArrayList(obj));
 			}
 			StringBuilder sql = new StringBuilder();
 			exprs = Lists.newArrayList(exprs == null ? Lists.newArrayList() : exprs);
-			exprs.addAll(model.getUpdateDefProperties().stream().map(p -> {
+			exprs.addAll(model.getUpdateTimeProperties().stream().map(p -> {
 				return p.getColumn() + " = :$newValuePrefix$" + p.getName();
 			}).collect(Collectors.toList()));
 			sql.append("insert into ")
@@ -312,7 +299,7 @@ public abstract class Savor<T> {
 			model.getInsertProperties().stream().forEach(p -> {
 				params.put(p.getName(), p.getOrInsertDef(obj));
 			});
-			model.getUpdateDefProperties().stream().forEach(p -> {
+			model.getUpdateTimeProperties().stream().forEach(p -> {
 				params.put("$newValuePrefix$" + p.getName(), p.getOrUpdateDef(obj));
 			});
 			return SqlParams.model(sql, params);
@@ -330,12 +317,12 @@ public abstract class Savor<T> {
 
 		public static SqlParams update(Model model, String table, Map<String, Object> newValues,
 						Map<String, Object> params) {
-			if ((newValues == null || newValues.isEmpty()) && model.getUpdateDefProperties().isEmpty()) {
+			if ((newValues == null || newValues.isEmpty()) && model.getUpdateTimeProperties().isEmpty()) {
 				throw new RuntimeException("invalid syntax");
 			}
 			StringBuilder sql = new StringBuilder();
 			Map<String, Object> innerNewValues = newValues == null ? Helper.newHashMap() : Maps.newHashMap(newValues);
-			model.getUpdateDefProperties().stream().forEach(p -> {
+			model.getUpdateTimeProperties().stream().forEach(p -> {
 				innerNewValues.putIfAbsent(p.getName(), p.updateDef());
 			});
 			if (params == null) {
@@ -376,8 +363,9 @@ public abstract class Savor<T> {
 															}).collect(Collectors.toList())))
 							.append("\n")
 							.append(SqlHelper.where(model, params));
-			params.putAll(innerNewValues.entrySet().stream()
-							.collect(Collectors.toMap(e -> "$newValuePrefix$" + e.getKey(), e -> e.getValue())));
+			for (Map.Entry<String, Object> entry : innerNewValues.entrySet()) {
+				params.put("$newValuePrefix$" + entry.getKey(), entry.getValue());
+			}
 			return SqlParams.model(sql, params);
 		}
 
@@ -393,7 +381,7 @@ public abstract class Savor<T> {
 			if (names == null || names.isEmpty()) {
 				sql.append("*");
 			} else {
-				sql.append(Joiner.on(",").join(Lists.newArrayList(names).stream().sorted().map(String::trim).map(n -> {
+				sql.append(Joiner.on(",").join(Lists.newArrayList(names).stream().map(String::trim).sorted().map(n -> {
 					Property property = model.getProperty(n);
 					if (property == null) {
 						return n;
@@ -406,7 +394,7 @@ public abstract class Savor<T> {
 							.append(SqlHelper.where(model, params));
 
 			if (orderExprs != null && !orderExprs.isEmpty()) {
-				sql.append(" order by " + Joiner.on(",").join(orderExprs.stream().sorted().map(String::trim).map(e -> {
+				sql.append(" order by " + Joiner.on(",").join(orderExprs.stream().map(String::trim).sorted().map(e -> {
 					Property p = model.getProperty(e);
 					if (p == null) {
 						return e;
@@ -493,7 +481,7 @@ public abstract class Savor<T> {
 		private final Map<String, Property> propertyMap;
 		private final List<Property> insertProperties;
 		private final List<Property> tableProperties;
-		private final List<Property> updateDefProperties;
+		private final List<Property> updateTimeProperties;
 
 		public Model(Class<?> clazz) {
 			super();
@@ -509,11 +497,11 @@ public abstract class Savor<T> {
 			this.tableProperties = Collections.unmodifiableList(Arrays.stream(clazz.getDeclaredFields())
 							.filter(f -> f.getAnnotation(TableKey.class) != null)
 							.map(f -> Tuple.tuple(f.getName(), f.getAnnotation(TableKey.class).index()))
-							.sorted(Comparator.comparing(Tuple::getY))
-							.map(tuple -> this.getProperty(tuple.x))
+							.sorted(Comparator.comparing(Tuple::getValue))
+							.map(tuple -> this.getProperty(tuple.key))
 							.collect(Collectors.toList()));
-			this.updateDefProperties = Collections.unmodifiableList(Arrays.stream(clazz.getDeclaredFields())
-							.filter(f -> f.getAnnotation(UpdateDef.class) != null)
+			this.updateTimeProperties = Collections.unmodifiableList(Arrays.stream(clazz.getDeclaredFields())
+							.filter(f -> f.getAnnotation(TimeUpdate.class) != null)
 							.map(f -> this.getProperty(f.getName()))
 							.collect(Collectors.toList()));
 			this.insertProperties = Collections.unmodifiableList(properties.stream()
@@ -621,7 +609,7 @@ public abstract class Savor<T> {
 	 */
 	@Target(ElementType.FIELD)
 	@Retention(RetentionPolicy.RUNTIME)
-	public @interface InsertDef {
+	public @interface TimeInsert {
 		String value() default "";
 	}
 
@@ -632,7 +620,7 @@ public abstract class Savor<T> {
 	 */
 	@Target(ElementType.FIELD)
 	@Retention(RetentionPolicy.RUNTIME)
-	public @interface UpdateDef {
+	public @interface TimeUpdate {
 		String value() default "";
 	}
 
@@ -642,20 +630,19 @@ public abstract class Savor<T> {
 	 *
 	 */
 	@Data
-	public static class Tuple<X, Y> {
-		private final X x;
-		private final Y y;
+	public static class Tuple<K, V> {
+		private final K key;
+		private final V value;
 
-		public static <X, Y> Tuple<X, Y> tuple(X x, Y y) {
-			return new Tuple<X, Y>(x, y);
+		public static <K, V> Tuple<K, V> tuple(K key, V value) {
+			return new Tuple<K, V>(key, value);
 		}
 
-		public Tuple(X x, Y y) {
+		public Tuple(K key, V value) {
 			super();
-			this.x = x;
-			this.y = y;
+			this.key = key;
+			this.value = value;
 		}
-
 	}
 
 }

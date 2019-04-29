@@ -2,6 +2,7 @@ package com.kj.repo.test;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import com.google.common.collect.Lists;
 
@@ -12,6 +13,11 @@ public class Test {
 
 		Integer v = list.stream().max(Comparator.comparingInt(k -> k)).orElse(0);
 		System.out.println(v);
+
+		IntStream.range(1, 100).boxed().forEach(i -> {
+			throw new RuntimeException("");
+		});
+
 	}
 
 	public static String get() {
