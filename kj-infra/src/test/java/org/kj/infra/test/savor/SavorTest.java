@@ -1,11 +1,11 @@
 package org.kj.infra.test.savor;
 
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.LongStream;
 
 import javax.sql.DataSource;
 
@@ -15,9 +15,9 @@ import org.springframework.jdbc.datasource.SimpleDriverDataSource;
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
 import com.kj.infra.savor.Savor;
-import com.kj.infra.savor.SavorHelper;
 import com.kj.infra.savor.Savor.TimeInsert;
 import com.kj.infra.savor.Savor.TimeUpdate;
+import com.kj.infra.savor.SavorHelper;
 import com.mysql.cj.jdbc.Driver;
 
 import lombok.Data;
@@ -27,7 +27,18 @@ import lombok.extern.slf4j.Slf4j;
 public class SavorTest {
 
 	public static void main(String[] args) throws SQLException {
-		test(args);
+		cartesian(args);
+	}
+
+	public static void cartesian(String[] args) {
+		List<List<Integer>> result = Savor.Helper.cartesian(Lists.newArrayList(
+						Lists.newArrayList(1, 2, 3, 4),
+						Lists.newArrayList(5, 6, 7, 8),
+						Lists.newArrayList(9, 10, 11, 12)));
+		for (List<Integer> l : result) {
+			System.out.println(l);
+		}
+
 	}
 
 	public static void testSet(String[] args) {
@@ -81,20 +92,20 @@ public class SavorTest {
 	public static void test(String[] args) throws SQLException {
 		SavorBaseTestDao dao = new SavorBaseTestDao(
 						new SimpleDriverDataSource(new Driver(), args[0], args[1], args[2]));
-		/**
-		 * test insert def
-		 */
-		LongStream.range(0, 10).boxed().forEach(i -> {
-			log.info("{}", dao.insert(LongStream.range(0, 10).boxed().map(j -> {
-				SavorBaseTest test = new SavorBaseTest();
-				test.setId(i * 10 + j + 1);
-				return test;
-			}).collect(Collectors.toList())));
-		});
+//		/**
+//		 * test insert def
+//		 */
+//		LongStream.range(0, 10).boxed().forEach(i -> {
+//			log.info("{}", dao.insert(LongStream.range(0, 10).boxed().map(j -> {
+//				SavorBaseTest test = new SavorBaseTest();
+//				test.setId(i * 10 + j + 1);
+//				return test;
+//			}).collect(Collectors.toList())));
+//		});
 
-		/**
-		 * test delete
-		 */
+//		/**
+//		 * test delete
+//		 */
 		dao.delete(Savor.Helper.newHashMap("id", 1));
 		IntStream.range(0, 10).boxed()
 						.forEach(i -> dao.update(Savor.Helper.newHashMap("name", "kj"),
