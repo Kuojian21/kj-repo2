@@ -1,6 +1,7 @@
 package org.kj.infra.test.savor;
 
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -28,6 +29,9 @@ public class SavorTest {
 
 	public static void main(String[] args) throws SQLException {
 		cartesian(args);
+
+		Object obj = new Object[] { 1, 2, 3, 4 };
+		System.out.println(Arrays.asList((Object[]) obj));
 	}
 
 	public static void cartesian(String[] args) {
@@ -38,7 +42,6 @@ public class SavorTest {
 		for (List<Integer> l : result) {
 			System.out.println(l);
 		}
-
 	}
 
 	public static void testSet(String[] args) {

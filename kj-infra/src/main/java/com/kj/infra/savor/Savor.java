@@ -36,6 +36,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
  * @author kuojian21
@@ -100,12 +101,16 @@ public abstract class Savor<T> {
 	}
 
 	public List<T> select(Map<String, Object> params) {
-		return this.select(null, params, null, null, null);
+		return this.select(params, null, null, null);
 	}
 
-	public List<T> select(List<String> names,
-					Map<String, Object> params, List<String> orderExprs, Integer offset, Integer limit) {
-		return this.select(names, params, orderExprs, offset, limit, this.getRowMapper());
+	public List<T> select(Map<String, Object> params, List<String> orderExprs, Integer offset, Integer limit) {
+		return this.select(null, params, orderExprs, offset, limit, this.getRowMapper());
+	}
+
+	@SuppressWarnings("checkstyle:HiddenField")
+	public <R> List<R> select(List<String> names, Map<String, Object> params, RowMapper<R> rowMapper) {
+		return this.select(names, params, null, null, null, rowMapper);
 	}
 
 	@SuppressWarnings("checkstyle:HiddenField")
@@ -129,16 +134,12 @@ public abstract class Savor<T> {
 		return rowMapper;
 	}
 
-	protected Function<Object, String> table2() {
-		return (obj) -> this.model.table;
-	}
-
 	protected Function<Object, String> table() {
-		return (obj) -> this.model.table;
+		throw new RuntimeException("not supported");
 	}
 
 	protected List<String> tables() {
-		return Lists.newArrayList(this.model.table);
+		throw new RuntimeException("not supported");
 	}
 
 	protected Map<String, Map<String, List<Param>>> table(Map<String, Object> paramMap) {
@@ -344,12 +345,24 @@ public abstract class Savor<T> {
 						op = Param.OP.NE;
 						break;
 					case "IN":
+						op = Param.OP.IN;
+					case "=":
+					case "EQ":
+						break;
 					default:
-						if (isArray(value)) {
-							op = Param.OP.IN;
-							break;
-						}
+						logger.error("invalid syntax:{}", key);
+						throw new RuntimeException("invalid syntax:" + key);
 					}
+				}
+				if (isArray(value)) {
+					if (op != Param.OP.IN && op != Param.OP.EQ) {
+						result.getOrDefault(p.getName(), Lists.newArrayList()).add(
+										new Param(p, Param.OP.EQ, value.getClass().isArray()
+														? Arrays.asList((Object[]) value)
+														: value));
+					}
+					logger.error("invalid syntax:{}", key);
+					throw new RuntimeException("invalid syntax:" + key);
 				}
 				result.getOrDefault(p.getName(), Lists.newArrayList()).add(new Param(p, op, value));
 			});
@@ -449,7 +462,7 @@ public abstract class Savor<T> {
 			Map<String, Object> params = Maps.newHashMap();
 			model.getInsertProperties().forEach(p -> params.put(p.getName(), p.getOrInsertDef(obj)));
 			model.getUpdateTimeProperties()
-							.forEach(p -> params.put(p.getName() + NEW_VALUE_SUFFIX, p.getOrUpdateDef(obj)));
+							.forEach(p -> params.putIfAbsent(p.getName() + NEW_VALUE_SUFFIX, p.getOrUpdateDef(obj)));
 			return SqlParams.model(sql, params);
 		}
 
@@ -465,12 +478,11 @@ public abstract class Savor<T> {
 		public static SqlParams update(Model model, String table, Map<String, List<Value>> values,
 						Map<String, List<Param>> params) {
 			if (CollectionUtils.isEmpty(values) && model.getUpdateTimeProperties().isEmpty()) {
+				logger.error("invalid syntax");
 				throw new RuntimeException("invalid syntax");
 			}
-
 			model.getUpdateTimeProperties().forEach(p -> values.putIfAbsent(p.getName(),
 							Lists.newArrayList(new Value(p, null, p.getUpdateDef().get()))));
-
 			StringBuilder sql = new StringBuilder();
 			sql.append("update ")
 							.append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
@@ -503,7 +515,6 @@ public abstract class Savor<T> {
 			sql.append(" from ")
 							.append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
 							.append(SqlHelper.where(params));
-
 			if (orderExprs != null && !orderExprs.isEmpty()) {
 				sql.append(" order by ")
 								.append(Joiner.on(",").join(orderExprs.stream().map(String::trim).sorted().map(e -> {
@@ -777,6 +788,7 @@ public abstract class Savor<T> {
 	/**
 	 * @author kuojian21
 	 */
+	@EqualsAndHashCode(callSuper = false)
 	@Data
 	public static class Param extends Expr {
 
@@ -824,6 +836,7 @@ public abstract class Savor<T> {
 	/**
 	 * @author kuojian21
 	 */
+	@EqualsAndHashCode(callSuper = false)
 	@Data
 	public static class Value extends Expr {
 
