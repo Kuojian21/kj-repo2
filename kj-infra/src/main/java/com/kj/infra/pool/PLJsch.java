@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Properties;
-import java.util.function.Consumer;
-import java.util.function.Function;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
@@ -196,6 +194,26 @@ public class PLJsch<T> {
 			}
 		}
 
+	}
+
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
+	@FunctionalInterface
+	public static interface Function<T, R> {
+		R apply(T t) throws Exception;
+	}
+
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
+	@FunctionalInterface
+	public interface Consumer<T> {
+		void accept(T t) throws Exception;
 	}
 
 }

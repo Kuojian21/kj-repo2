@@ -18,7 +18,6 @@ import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.function.BiFunction;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -293,12 +292,8 @@ public abstract class PLCrypt<T, R> {
 	 *
 	 */
 	public static class Helper {
-		public static byte[] cipher(Cipher cipher, byte[] data) {
-			try {
-				return cipher.doFinal(data);
-			} catch (IllegalBlockSizeException | BadPaddingException e) {
-				throw new RuntimeException(e);
-			}
+		public static byte[] cipher(Cipher cipher, byte[] data) throws IllegalBlockSizeException, BadPaddingException {
+			return cipher.doFinal(data);
 		}
 
 		public static byte[] digest(MessageDigest digest, byte[] data) {
@@ -309,21 +304,14 @@ public abstract class PLCrypt<T, R> {
 			return mac.doFinal(data);
 		}
 
-		public static byte[] sign(Signature signature, byte[] data) {
-			try {
-				signature.update(data);
-				return signature.sign();
-			} catch (SignatureException e) {
-				throw new RuntimeException(e);
-			}
+		public static byte[] sign(Signature signature, byte[] data) throws SignatureException {
+			signature.update(data);
+			return signature.sign();
+
 		}
 
-		public static boolean verify(Signature signature, byte[] data) {
-			try {
-				return signature.verify(data);
-			} catch (SignatureException e) {
-				throw new RuntimeException(e);
-			}
+		public static boolean verify(Signature signature, byte[] data) throws SignatureException {
+			return signature.verify(data);
 		}
 	}
 
@@ -440,6 +428,16 @@ public abstract class PLCrypt<T, R> {
 		public String getTransformation() {
 			return this.transformation;
 		}
+	}
+
+	/**
+	 * 
+	 * @author kuojian21
+	 * 
+	 */
+	@FunctionalInterface
+	public interface BiFunction<T, U, R> {
+		R apply(T t, U u) throws Exception;
 	}
 
 }

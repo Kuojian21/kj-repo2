@@ -1,11 +1,8 @@
 package com.kj.infra.pool;
 
 import java.io.Closeable;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
@@ -92,11 +89,7 @@ public class PLJedis<T> {
 			return Helper.enhancer(clazz, (method, args) -> {
 				try {
 					return jedis.execute(f -> {
-						try {
-							return method.invoke(f, args);
-						} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-							throw new RuntimeException(e);
-						}
+						return method.invoke(f, args);
 					});
 				} catch (Exception e) {
 					throw new RuntimeException(e);
@@ -124,6 +117,26 @@ public class PLJedis<T> {
 			});
 			return (T) enhancer.create();
 		}
+	}
+
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
+	@FunctionalInterface
+	public static interface Function<T, R> {
+		R apply(T t) throws Exception;
+	}
+
+	/**
+	 * 
+	 * @author kuojian21
+	 *
+	 */
+	@FunctionalInterface
+	public interface Consumer<T> {
+		void accept(T t) throws Exception;
 	}
 
 }
