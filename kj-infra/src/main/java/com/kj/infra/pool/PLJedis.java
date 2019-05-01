@@ -23,11 +23,11 @@ import redis.clients.util.Pool;
  *
  * @param <T>
  */
-public class KjJedis<T> {
+public class PLJedis<T> {
 
 	private final GenericObjectPool<T> pool;
 
-	public KjJedis(final GenericObjectPool<T> pool) {
+	public PLJedis(final GenericObjectPool<T> pool) {
 		this.pool = pool;
 	}
 
@@ -61,8 +61,8 @@ public class KjJedis<T> {
 	 *
 	 */
 	public static class Jedis {
-		public static <T extends Closeable> KjJedis<T> jedis(Pool<T> pool) {
-			return new KjJedis<T>(new GenericObjectPool<T>(new BasePooledObjectFactory<T>() {
+		public static <T extends Closeable> PLJedis<T> jedis(Pool<T> pool) {
+			return new PLJedis<T>(new GenericObjectPool<T>(new BasePooledObjectFactory<T>() {
 				@Override
 				public T create() throws Exception {
 					return pool.getResource();
@@ -88,7 +88,7 @@ public class KjJedis<T> {
 		}
 
 		public static <T extends Closeable> T jedis(Pool<T> pool, Class<T> clazz) {
-			KjJedis<T> jedis = jedis(pool);
+			PLJedis<T> jedis = jedis(pool);
 			return Helper.enhancer(clazz, (method, args) -> {
 				try {
 					return jedis.execute(f -> {

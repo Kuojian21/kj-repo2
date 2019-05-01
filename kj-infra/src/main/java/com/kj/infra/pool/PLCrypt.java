@@ -43,11 +43,11 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
  * @param <T>
  * @param <R>
  */
-public abstract class KjCrypt<T, R> {
+public abstract class PLCrypt<T, R> {
 
 	private final GenericObjectPool<T> pool;
 
-	public KjCrypt(final GenericObjectPool<T> pool) {
+	public PLCrypt(final GenericObjectPool<T> pool) {
 		this.pool = pool;
 	}
 
@@ -76,8 +76,8 @@ public abstract class KjCrypt<T, R> {
 	 */
 	public static class KjCipher {
 
-		public static KjCrypt<Cipher, byte[]> encrypt(String algorithm, Key key, IvParameterSpec ivp) {
-			return new KjCrypt<Cipher, byte[]>(new GenericObjectPool<Cipher>(new BasePooledObjectFactory<Cipher>() {
+		public static PLCrypt<Cipher, byte[]> encrypt(String algorithm, Key key, IvParameterSpec ivp) {
+			return new PLCrypt<Cipher, byte[]>(new GenericObjectPool<Cipher>(new BasePooledObjectFactory<Cipher>() {
 				@Override
 				public PooledObject<Cipher> wrap(Cipher cipher) {
 					return new DefaultPooledObject<Cipher>(cipher);
@@ -98,8 +98,8 @@ public abstract class KjCrypt<T, R> {
 			};
 		}
 
-		public static KjCrypt<Cipher, byte[]> decrypt(String algorithm, Key key, IvParameterSpec ivp) {
-			return new KjCrypt<Cipher, byte[]>(new GenericObjectPool<Cipher>(new BasePooledObjectFactory<Cipher>() {
+		public static PLCrypt<Cipher, byte[]> decrypt(String algorithm, Key key, IvParameterSpec ivp) {
+			return new PLCrypt<Cipher, byte[]>(new GenericObjectPool<Cipher>(new BasePooledObjectFactory<Cipher>() {
 				@Override
 				public PooledObject<Cipher> wrap(Cipher cipher) {
 					return new DefaultPooledObject<Cipher>(cipher);
@@ -127,8 +127,8 @@ public abstract class KjCrypt<T, R> {
 	 *
 	 */
 	public static class KjMessageDigest {
-		public static KjCrypt<MessageDigest, byte[]> digest(String algorithm) {
-			return new KjCrypt<MessageDigest, byte[]>(
+		public static PLCrypt<MessageDigest, byte[]> digest(String algorithm) {
+			return new PLCrypt<MessageDigest, byte[]>(
 							new GenericObjectPool<MessageDigest>(new BasePooledObjectFactory<MessageDigest>() {
 								@Override
 								public PooledObject<MessageDigest> wrap(MessageDigest digest) {
@@ -155,8 +155,8 @@ public abstract class KjCrypt<T, R> {
 	 *
 	 */
 	public static class KjMac {
-		public static KjCrypt<Mac, byte[]> mac(String algorithm, SecretKey key) {
-			return new KjCrypt<Mac, byte[]>(new GenericObjectPool<Mac>(new BasePooledObjectFactory<Mac>() {
+		public static PLCrypt<Mac, byte[]> mac(String algorithm, SecretKey key) {
+			return new PLCrypt<Mac, byte[]>(new GenericObjectPool<Mac>(new BasePooledObjectFactory<Mac>() {
 				@Override
 				public PooledObject<Mac> wrap(Mac mac) {
 					return new DefaultPooledObject<Mac>(mac);
@@ -185,8 +185,8 @@ public abstract class KjCrypt<T, R> {
 	 *
 	 */
 	public static class KjSignature {
-		public static KjCrypt<Signature, byte[]> sign(String algorithm, PrivateKey privateKey) {
-			return new KjCrypt<Signature, byte[]>(
+		public static PLCrypt<Signature, byte[]> sign(String algorithm, PrivateKey privateKey) {
+			return new PLCrypt<Signature, byte[]>(
 							new GenericObjectPool<Signature>(new BasePooledObjectFactory<Signature>() {
 								@Override
 								public PooledObject<Signature> wrap(Signature signature) {
@@ -207,8 +207,8 @@ public abstract class KjCrypt<T, R> {
 			};
 		}
 
-		public static KjCrypt<Signature, Boolean> verify(String algorithm, PublicKey publicKey) {
-			return new KjCrypt<Signature, Boolean>(
+		public static PLCrypt<Signature, Boolean> verify(String algorithm, PublicKey publicKey) {
+			return new PLCrypt<Signature, Boolean>(
 							new GenericObjectPool<Signature>(new BasePooledObjectFactory<Signature>() {
 								@Override
 								public PooledObject<Signature> wrap(Signature signature) {

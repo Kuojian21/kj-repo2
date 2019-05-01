@@ -1,4 +1,4 @@
-package org.kj.infra.test.pool;
+package org.kj.infra.pool;
 
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -21,30 +21,30 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 
 import com.google.common.base.Stopwatch;
-import com.kj.infra.pool.KjCrypt;
+import com.kj.infra.pool.PLCrypt;
 
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class CryptTest {
+public class TePLCrypt {
 
 	public static void main(String[] args) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException,
 					InvalidKeyException, InvalidKeySpecException, InterruptedException, ExecutionException {
 
-		Key key = KjCrypt.Factory.generateKey(KjCrypt.Algorithm.Crypt.DESede.getName(),
-						KjCrypt.Algorithm.Crypt.DESede.getKeysize(),
+		Key key = PLCrypt.Factory.generateKey(PLCrypt.Algorithm.Crypt.DESede.getName(),
+						PLCrypt.Algorithm.Crypt.DESede.getKeysize(),
 						null);
 		System.out.println(Base64.getEncoder().encodeToString(key.getEncoded()));
-		KeyPair keyPair = KjCrypt.Factory.generateKeyPair(
-						KjCrypt.Algorithm.Crypt.RSA_2048.getName(),
-						KjCrypt.Algorithm.Crypt.RSA_2048.getKeysize(), null);
+		KeyPair keyPair = PLCrypt.Factory.generateKeyPair(
+						PLCrypt.Algorithm.Crypt.RSA_2048.getName(),
+						PLCrypt.Algorithm.Crypt.RSA_2048.getKeysize(), null);
 		System.out.println(Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded()));
 		System.out.println(Base64.getEncoder().encodeToString(keyPair.getPrivate().getEncoded()));
 
 		perf("DESede/CBC/PKCS5Padding",
-						KjCrypt.Factory.loadKey("DESede",
+						PLCrypt.Factory.loadKey("DESede",
 										Base64.getDecoder().decode("L/gx33BYzjQLj12FhlSXlEosuVSwKl1M")),
-						KjCrypt.Factory.loadIvp("11111111".getBytes()), 10000000, 10, 1);
+						PLCrypt.Factory.loadIvp("11111111".getBytes()), 10000000, 10, 1);
 
 	}
 
@@ -59,8 +59,8 @@ public class CryptTest {
 	public static long perf1(String algorithm, Key key, IvParameterSpec ivp, int total, int thread, int times)
 					throws InterruptedException, InvalidKeyException, InvalidKeySpecException,
 					NoSuchAlgorithmException, ExecutionException {
-		KjCrypt<Cipher, byte[]> encrypt = KjCrypt.KjCipher.encrypt(algorithm, key, ivp);
-		KjCrypt<Cipher, byte[]> decrypt = KjCrypt.KjCipher.decrypt(algorithm, key, ivp);
+		PLCrypt<Cipher, byte[]> encrypt = PLCrypt.KjCipher.encrypt(algorithm, key, ivp);
+		PLCrypt<Cipher, byte[]> decrypt = PLCrypt.KjCipher.decrypt(algorithm, key, ivp);
 		ExecutorService executor = Executors.newFixedThreadPool(thread);
 
 		Stopwatch stopwatch = Stopwatch.createStarted();
@@ -120,8 +120,8 @@ public class CryptTest {
 
 						long rtn = 0;
 						for (int i = 0; i < times; i++) {
-							rtn += new String(KjCrypt.Helper.cipher(decrypt,
-											KjCrypt.Helper.cipher(encrypt, ("kuojian" + j).getBytes()))).hashCode()
+							rtn += new String(PLCrypt.Helper.cipher(decrypt,
+											PLCrypt.Helper.cipher(encrypt, ("kuojian" + j).getBytes()))).hashCode()
 											% Integer.MAX_VALUE;
 						}
 						return rtn;

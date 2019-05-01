@@ -1,8 +1,8 @@
 package com.kj.infra.pool;
 
+import java.net.URL;
 import java.util.List;
-import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
@@ -12,32 +12,30 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
 import com.gargoylesoftware.htmlunit.WebClient;
-import com.gargoylesoftware.htmlunit.html.DomAttr;
+import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlTable;
-import com.gargoylesoftware.htmlunit.html.HtmlTableBody;
-import com.gargoylesoftware.htmlunit.html.HtmlTableCell;
-import com.gargoylesoftware.htmlunit.html.HtmlTableRow;
 import com.google.common.collect.Lists;
+
+import io.reactivex.Observable;
+import lombok.Data;
 
 /**
  * @author kuojian21 http://htmlunit.sourceforge.net/
  */
-public class KjBrowser<T> {
+public class PLBrowser<T> {
 
 	private final GenericObjectPool<T> pool;
 
-	public KjBrowser(final GenericObjectPool<T> pool) {
+	public PLBrowser(final GenericObjectPool<T> pool) {
 		this.pool = pool;
 	}
 
-	public final <R> R execute(Function<T, R> function) {
+	public final <R> R execute(Function<T, R> function) throws Exception {
 		T t = null;
 		try {
 			t = this.pool.borrowObject();
 			return function.apply(t);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
 		} finally {
 			if (t != null) {
 				this.pool.returnObject(t);
@@ -45,13 +43,11 @@ public class KjBrowser<T> {
 		}
 	}
 
-	public final void execute(Consumer<T> consumer) {
+	public final void execute(Consumer<T> consumer) throws Exception {
 		T t = null;
 		try {
 			t = this.pool.borrowObject();
 			consumer.accept(t);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
 		} finally {
 			if (t != null) {
 				this.pool.returnObject(t);
@@ -59,8 +55,12 @@ public class KjBrowser<T> {
 		}
 	}
 
-	public static KjBrowser<WebClient> browser(BrowserVersion version) {
-		return new KjBrowser<WebClient>(new GenericObjectPool<WebClient>(new BasePooledObjectFactory<WebClient>() {
+	public final void shutdown() {
+		this.pool.close();
+	}
+
+	public static PLBrowser<WebClient> browser(BrowserVersion version) {
+		return new PLBrowser<WebClient>(new GenericObjectPool<WebClient>(new BasePooledObjectFactory<WebClient>() {
 			@Override
 			public PooledObject<WebClient> wrap(WebClient webClient) {
 				return new DefaultPooledObject<WebClient>(webClient);
@@ -94,16 +94,33 @@ public class KjBrowser<T> {
 	 *
 	 */
 	public static class Helper {
-		public static <T> List<String> parseText(HtmlPage page, String xpath) {
-			List<String> result = Lists.newArrayList();
-			List<T> nodes = page.getByXPath(xpath);
-			for (T node : nodes) {
-				switch (node.getClass().getName()) {
-				case "DomAttr":
-					result.addAll(parse((DomAttr) node));
+
+		@SuppressWarnings("unchecked")
+		public static <N, T> List<T> parse(HtmlPage page, String xpath) {
+			List<T> result = Lists.newArrayList();
+			List<N> nodes = page.getByXPath(xpath);
+			URL url = page.getBaseURL();
+			for (N node : nodes) {
+				switch (node.getClass().getSimpleName()) {
+				case "HtmlAnchor":
+					Observable.just((HtmlAnchor) node).subscribe(n -> {
+						String href = n.getHrefAttribute();
+						if (href.startsWith("http")) {
+							result.add((T) href);
+						} else {
+							result.add((T) (url.getProtocol() + "://" + url.getHost() + href));
+						}
+					});
 					break;
 				case "HtmlTable":
-					result.addAll(parse((HtmlTable) node));
+					result.addAll((List<T>) ((HtmlTable) node)
+									.getBodies()
+									.stream()
+									.flatMap(b -> b.getRows().stream())
+									.map(r -> r.getCells().stream().map(c -> c.asText()).collect(Collectors.toList()))
+//									.flatMap(r -> r.getCells().stream())
+//									.map(c -> c.asText().trim())
+									.collect(Collectors.toList()));
 					break;
 				default:
 
@@ -112,42 +129,35 @@ public class KjBrowser<T> {
 			}
 			return result;
 		}
+	}
 
-		public static <T> List<String> parseURL(HtmlPage page, String xpath) {
-			List<String> result = Lists.newArrayList();
-			List<T> nodes = page.getByXPath(xpath);
-			for (T node : nodes) {
-				switch (node.getClass().getName()) {
-				case "DomAttr":
-					result.addAll(parse((DomAttr) node));
-					break;
-				case "HtmlTable":
-					break;
-				default:
+	/**
+	 * @author kuojian21
+	 */
+	@Data
+	public static class Tuple<X, Y> {
+		private final X x;
+		private final Y y;
 
-				}
-
-			}
-			return result;
+		public static <X, Y> Tuple<X, Y> tuple(X x, Y y) {
+			return new Tuple<>(x, y);
 		}
 
-		public static List<String> parse(DomAttr node) {
-			return Lists.newArrayList(node.getValue().trim());
+		public Tuple(X x, Y v) {
+			super();
+			this.x = x;
+			this.y = v;
 		}
+	}
 
-		public static List<String> parse(HtmlTable node) {
-			List<String> result = Lists.newArrayList();
-			List<HtmlTableBody> bodies = node.getBodies();
-			for (HtmlTableBody body : bodies) {
-				for (HtmlTableRow row : body.getRows()) {
-					for (HtmlTableCell cell : row.getCells()) {
-						result.add(cell.asText().trim());
-					}
-				}
-			}
-			return result;
-		}
+	@FunctionalInterface
+	public static interface Function<T, R> {
+		R apply(T t) throws Exception;
+	}
 
+	@FunctionalInterface
+	public interface Consumer<T> {
+		void accept(T t) throws Exception;
 	}
 
 }

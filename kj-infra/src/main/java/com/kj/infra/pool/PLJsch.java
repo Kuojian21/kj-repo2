@@ -24,11 +24,11 @@ import com.jcraft.jsch.SftpException;
  *
  * @param <T>
  */
-public class KjJsch<T> {
+public class PLJsch<T> {
 
 	private final GenericObjectPool<T> pool;
 
-	public KjJsch(final GenericObjectPool<T> pool) {
+	public PLJsch(final GenericObjectPool<T> pool) {
 		this.pool = pool;
 	}
 
@@ -62,8 +62,8 @@ public class KjJsch<T> {
 	 *
 	 */
 	public static class Jsch {
-		public static KjJsch<ChannelSftp> jsch(String host, int port, String username, String password) {
-			return new KjJsch<ChannelSftp>(
+		public static PLJsch<ChannelSftp> jsch(String host, int port, String username, String password) {
+			return new PLJsch<ChannelSftp>(
 							new GenericObjectPool<ChannelSftp>(new BasePooledObjectFactory<ChannelSftp>() {
 								@Override
 								public ChannelSftp create() throws Exception {
@@ -93,9 +93,9 @@ public class KjJsch<T> {
 							}));
 		}
 
-		public static KjJsch<ChannelSftp> jsch(String host, int port, String username, String prvfile, String pubfile,
+		public static PLJsch<ChannelSftp> jsch(String host, int port, String username, String prvfile, String pubfile,
 						byte[] passphrase) {
-			return new KjJsch<ChannelSftp>(
+			return new PLJsch<ChannelSftp>(
 							new GenericObjectPool<ChannelSftp>(new BasePooledObjectFactory<ChannelSftp>() {
 								@Override
 								public ChannelSftp create() throws Exception {

@@ -1,4 +1,4 @@
-package org.kj.infra.test.savor;
+package org.kj.infra.savor;
 
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -25,7 +25,7 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class SavorTest {
+public class TeSavor {
 
 	public static void main(String[] args) throws SQLException {
 		cartesian(args);

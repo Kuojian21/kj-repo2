@@ -1,10 +1,10 @@
-package org.kj.infra.test.helper;
+package org.kj.infra.helper;
 
 import java.util.concurrent.CountDownLatch;
 
 import com.kj.infra.bean.SnowflakeBean;
 
-public class SnowflakeTest {
+public class TeSnowflake {
 	public static void main(String[] args) throws InterruptedException {
 		SnowflakeBean worker = new SnowflakeBean(1);
 		CountDownLatch latch = new CountDownLatch(100);
