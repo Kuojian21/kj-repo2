@@ -1,0 +1,23 @@
+package org.kj.infra.tool;
+
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
+import com.kj.infra.tool.TLJavaCompiler;
+
+public class TeTLJavaCompiler {
+
+	public static void main(String[] args) throws ClassNotFoundException, NoSuchMethodException, SecurityException,
+					IllegalAccessException, IllegalArgumentException, InvocationTargetException, IOException {
+		String body = "public class CalculatorTest { "
+						+ " public static int multiply(int multiplicand, int multiplier) { "
+						+ " System.out.println(multiplicand); " + " System.out.println(multiplier);"
+						+ "return multiplicand + multiplier; }" + "}";
+		Class<?> clazz = TLJavaCompiler.compile("CalculatorTest", body);
+
+		Method method = clazz.getMethod("multiply", new Class<?>[] { int.class, int.class });
+		System.out.println(method.invoke(null, 2, 3));
+	}
+
+}

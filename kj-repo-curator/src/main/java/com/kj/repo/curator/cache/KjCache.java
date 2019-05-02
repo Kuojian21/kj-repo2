@@ -19,8 +19,13 @@ public class KjCache {
 		return CuratorFrameworkFactory.newClient(connectString, retryPolicy);
 	}
 
+	public static void set(CuratorFramework curatorFramework, String path) {
+		curatorFramework.setData().forPath(path);
+	}
+	
 	public static TreeCache treeCache(CuratorFramework curatorFramework, String path) throws Exception {
 		TreeCache cache = new TreeCache(curatorFramework, path);
+		
 		cache.getListenable().addListener(new TreeCacheListener() {
 			@Override
 			public void childEvent(CuratorFramework client, TreeCacheEvent event) throws Exception {
