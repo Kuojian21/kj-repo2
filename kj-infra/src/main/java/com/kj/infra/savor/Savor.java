@@ -83,12 +83,24 @@ public abstract class Savor<T> {
 				.map(e -> SqlHelper.insert(this.model, e.getKey(), e.getValue(), true)));
 	}
 
-	public int upsert(List<T> objs, List<String> updateExprs) {
+	public int upsert(List<T> objs, List<String> names) {
 		if (objs == null || objs.isEmpty()) {
 			return 0;
 		}
-		return this.update(this.table(objs).entrySet().stream()
-				.map(e -> SqlHelper.upsert(this.model, e.getKey(), e.getValue(), updateExprs)));
+		Map<String, Object> values = Maps.newHashMap();
+		if (!CollectionUtils.isEmpty(names)) {
+			values = this.model.getProperties(names).stream()
+					.collect(Collectors.toMap(p -> p.getName() + "#EXPR", p -> "values(" + p.getColumn() + ")"));
+		}
+		return this.upsert(objs, values);
+	}
+
+	public int upsert(List<T> objs, Map<String, Object> values) {
+		if (objs == null || objs.isEmpty()) {
+			return 0;
+		}
+		return this.update(this.table(objs).entrySet().stream().map(e -> SqlHelper.upsert(this.model, e.getKey(),
+				e.getValue(), Helper.initValues(this.model, values, true))));
 	}
 
 	public int delete(Map<String, Object> params) {
@@ -98,7 +110,7 @@ public abstract class Savor<T> {
 
 	public int update(Map<String, Object> values, Map<String, Object> params) {
 		return this.update(this.table(params).entrySet().stream()
-				.map(e -> SqlHelper.update(model, e.getKey(), Helper.initValues(model, values), e.getValue())));
+				.map(e -> SqlHelper.update(model, e.getKey(), Helper.initValues(model, values, false), e.getValue())));
 	}
 
 	public List<T> select(Map<String, Object> params) {
@@ -270,17 +282,16 @@ public abstract class Savor<T> {
 			return paramMap;
 		}
 
-		public static Map<String, Object> paramValueMap(Map<String, List<Param>> params,
-				Map<String, List<Value>> values) {
-			Map<String, Object> paramMap = Maps.newHashMap();
-			params.forEach((key, value) -> value.forEach(v -> paramMap.put(v.getVName(), v.getValue())));
-			values.forEach((key, value) -> value.forEach(v -> paramMap.put(v.getVName(), v.getValue())));
+		public static Map<String, Object> valueMap(Map<String, Object> paramMap, Map<String, Value> values) {
+			values.values().forEach(v -> paramMap.put(v.getVName(), v.getValue()));
 			return paramMap;
 		}
 
-		public static Map<String, List<Value>> initValues(Model model, Map<String, Object> values) {
-			Map<String, List<Value>> result = Maps.newHashMap();
+		public static Map<String, Value> initValues(Model model, Map<String, Object> values, boolean upsert) {
+			Map<String, Value> result = Maps.newHashMap();
 			if (CollectionUtils.isEmpty(values)) {
+				model.getUpdateTimeProperties().forEach(p -> result.putIfAbsent(p.getName(),
+						new Value(p, Value.OP.EQ, upsert, p.getUpdateDef().get())));
 				return result;
 			}
 			values.forEach((key, value) -> {
@@ -303,8 +314,10 @@ public abstract class Savor<T> {
 						break;
 					}
 				}
-				result.getOrDefault(p.getName(), Lists.newArrayList()).add(new Value(p, op, value));
+				result.putIfAbsent(p.getName(), new Value(p, op, upsert, value));
 			});
+			model.getUpdateTimeProperties().forEach(
+					p -> result.putIfAbsent(p.getName(), new Value(p, Value.OP.EQ, upsert, p.getUpdateDef().get())));
 			return result;
 		}
 
@@ -422,20 +435,14 @@ public abstract class Savor<T> {
 			return SqlParams.model(sql, params);
 		}
 
-		public static <T> SqlParams upsert(Model model, String table, List<T> objs, List<String> exprs) {
-			if ((exprs == null || exprs.isEmpty()) && model.getUpdateTimeProperties().isEmpty()) {
+		public static <T> SqlParams upsert(Model model, String table, List<T> objs, Map<String, Value> values) {
+			if (CollectionUtils.isEmpty(values)) {
 				return SqlHelper.insert(model, table, objs, true);
 			}
 			SqlParams sqlParams = SqlHelper.insert(model, table, objs, false);
-			exprs = exprs == null ? Lists.newArrayList() : Lists.newArrayList(exprs);
-			exprs.addAll(model.getUpdateTimeProperties().stream()
-					.map(p -> p.getColumn() + " = :" + p.getName() + NEW_VALUE_SUFFIX).collect(Collectors.toList()));
-			sqlParams.getSql().append(" on duplicate key update ")
-					.append(Joiner.on(",").join(exprs.stream().sorted().collect(Collectors.toList())));
-
-			Map<String, Object> params = sqlParams.getParams();
-			model.getUpdateTimeProperties()
-					.forEach(p -> params.putIfAbsent(p.getName() + NEW_VALUE_SUFFIX, p.getUpdateDef().get()));
+			sqlParams.getSql().append(" on duplicate key update ").append(Joiner.on(",").join(values.entrySet().stream()
+					.sorted(Comparator.comparing(Map.Entry::getKey)).collect(Collectors.toList())));
+			Helper.valueMap(sqlParams.getParams(), values);
 			return sqlParams;
 		}
 
@@ -446,23 +453,20 @@ public abstract class Savor<T> {
 			return SqlParams.model(sql, Helper.paramMap(params));
 		}
 
-		public static SqlParams update(Model model, String table, Map<String, List<Value>> values,
+		public static SqlParams update(Model model, String table, Map<String, Value> values,
 				Map<String, List<Param>> params) {
 			if (CollectionUtils.isEmpty(values) && model.getUpdateTimeProperties().isEmpty()) {
 				logger.error("invalid syntax");
 				throw new RuntimeException("invalid syntax");
 			}
-			model.getUpdateTimeProperties().forEach(p -> values.putIfAbsent(p.getName(),
-					Lists.newArrayList(new Value(p, Value.OP.EQ, p.getUpdateDef().get()))));
 			StringBuilder sql = new StringBuilder();
 			sql.append("update ").append(Strings.isNullOrEmpty(table) ? model.getTable() : table).append("\n")
 					.append(" set ")
 					.append(Joiner.on(",")
-							.join(values.entrySet().stream().flatMap(e -> e.getValue().stream())
-									.sorted(Comparator.comparing(Value::getVName)).map(Value::getExpr)
-									.collect(Collectors.toList())))
+							.join(values.values().stream().sorted(Comparator.comparing(Value::getVName))
+									.map(Value::getExpr).collect(Collectors.toList())))
 					.append("\n").append(SqlHelper.where(params));
-			return SqlParams.model(sql, Helper.paramValueMap(params, values));
+			return SqlParams.model(sql, Helper.valueMap(Helper.paramMap(params), values));
 		}
 
 		public static SqlParams select(Model model, String table, List<String> names, Map<String, List<Param>> params,
@@ -788,8 +792,8 @@ public abstract class Savor<T> {
 
 		private final OP op;
 
-		public Value(Property p, OP op, Object value) {
-			super(getVName(p, op), getExpr(p, op), value);
+		public Value(Property p, OP op, boolean upsert, Object value) {
+			super(getVName(p, op), getExpr(p, op, upsert, value), value);
 			this.op = op;
 		}
 
@@ -797,12 +801,15 @@ public abstract class Savor<T> {
 			return (op == OP.EQ ? p.name : p.name + "#" + op.name()) + NEW_VALUE_SUFFIX;
 		}
 
-		public static String getExpr(Property p, OP op) {
+		public static String getExpr(Property p, OP op, boolean upsert, Object value) {
 			switch (op) {
 			case EXPR:
-				return p.getColumn() + " in ( :" + getVName(p, op) + " )";
+				return p.getColumn() + " = " + value;
 			case ADD:
 			case SUB:
+				if (upsert) {
+					return p.getColumn() + " = values(" + p.getColumn() + ") " + op.symbol + " :" + getVName(p, op);
+				}
 				return p.getColumn() + " = " + p.getColumn() + " " + op.symbol + " :" + getVName(p, op);
 			case EQ:
 			default:
