@@ -5,8 +5,6 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Lists;
 
-import lombok.Data;
-
 /**
  * 
  * @author kuojian21
@@ -39,43 +37,24 @@ public class Algorithm {
 		return result;
 	}
 
-	/**
-	 * @author kuojian21
-	 */
-	@Data
-	public static class Cartesian<T> {
-		private final List<List<T>> objs;
-		private final int size;
-		private final List<List<T>> result;
-		private final List<List<T>> tObjs;
-
-		public Cartesian(List<List<T>> objs) {
-			this.objs = objs;
-			this.size = objs.size();
-			this.result = Lists.newArrayList();
-			this.tObjs = objs.stream().map(Lists::newArrayList).collect(Collectors.toList());
-			this.handle();
+	public static <T> List<List<T>> cartesian(List<List<T>> objs, List<List<T>> tObjs, int size, List<List<T>> result) {
+		List<T> t = Lists.newArrayList();
+		for (int i = 0; i < size; i++) {
+			t.add(tObjs.get(i).get(0));
 		}
-
-		public void handle() {
-			List<T> t = Lists.newArrayList();
-			for (int i = 0; i < size; i++) {
-				t.add(tObjs.get(i).get(0));
-			}
-			result.add(t);
-			for (int i = size - 1; i >= 0; i--) {
-				tObjs.get(i).remove(0);
-				if (tObjs.get(i).size() > 0) {
-					for (int j = i + 1; j < size; j++) {
-						tObjs.add(Lists.newArrayList(objs.get(j)));
-					}
-					this.handle();
-					return;
-				} else {
-					tObjs.remove(i);
+		result.add(t);
+		for (int i = size - 1; i >= 0; i--) {
+			tObjs.get(i).remove(0);
+			if (tObjs.get(i).size() > 0) {
+				for (int j = i + 1; j < size; j++) {
+					tObjs.add(Lists.newArrayList(objs.get(j)));
 				}
+				return cartesian(objs, tObjs, size, result);
+			} else {
+				tObjs.remove(i);
 			}
 		}
+		return result;
 	}
 
 }
