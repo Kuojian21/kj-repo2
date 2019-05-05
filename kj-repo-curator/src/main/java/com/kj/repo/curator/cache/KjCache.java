@@ -19,7 +19,7 @@ public class KjCache {
 		return CuratorFrameworkFactory.newClient(connectString, retryPolicy);
 	}
 
-	public static void set(CuratorFramework curatorFramework, String path) {
+	public static void set(CuratorFramework curatorFramework, String path) throws Exception {
 		curatorFramework.setData().forPath(path);
 	}
 	

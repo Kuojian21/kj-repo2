@@ -79,25 +79,26 @@ public abstract class Savor<T> {
 		if (objs == null || objs.isEmpty()) {
 			return 0;
 		}
-		return this.update(this.table(objs).entrySet().stream()
-						.map(e -> SqlHelper.insert(this.model, e.getKey(), e.getValue())));
+		return this.update(
+				this.table(objs).entrySet().stream().map(e -> SqlHelper.insert(this.model, e.getKey(), e.getValue())));
 	}
 
-	public int upsert(T obj, List<String> updateExprs) {
-		if (obj == null) {
+	public int upsert(List<T> objs, List<String> updateExprs) {
+		if (objs == null || objs.isEmpty()) {
 			return 0;
 		}
-		return this.update(SqlHelper.upsert(this.model, this.table(obj), obj, updateExprs));
+		return this.update(this.table(objs).entrySet().stream()
+				.map(e -> SqlHelper.upsert(this.model, e.getKey(), e.getValue(), updateExprs)));
 	}
 
 	public int delete(Map<String, Object> params) {
 		return this.update(this.table(params).entrySet().stream()
-						.map(e -> SqlHelper.delete(this.model, e.getKey(), e.getValue())));
+				.map(e -> SqlHelper.delete(this.model, e.getKey(), e.getValue())));
 	}
 
 	public int update(Map<String, Object> values, Map<String, Object> params) {
 		return this.update(this.table(params).entrySet().stream()
-						.map(e -> SqlHelper.update(model, e.getKey(), Helper.initValues(model, values), e.getValue())));
+				.map(e -> SqlHelper.update(model, e.getKey(), Helper.initValues(model, values), e.getValue())));
 	}
 
 	public List<T> select(Map<String, Object> params) {
@@ -114,12 +115,12 @@ public abstract class Savor<T> {
 	}
 
 	@SuppressWarnings("checkstyle:HiddenField")
-	public <R> List<R> select(List<String> names,
-					Map<String, Object> params, List<String> orderExprs, Integer offset, Integer limit,
-					RowMapper<R> rowMapper) {
-		return this.select(this.table(params).entrySet().stream().map(
+	public <R> List<R> select(List<String> names, Map<String, Object> params, List<String> orderExprs, Integer offset,
+			Integer limit, RowMapper<R> rowMapper) {
+		return this.select(
+				this.table(params).entrySet().stream().map(
 						e -> SqlHelper.select(this.model, e.getKey(), names, e.getValue(), orderExprs, offset, limit)),
-						rowMapper);
+				rowMapper);
 	}
 
 	public Model getModel() {
@@ -157,21 +158,14 @@ public abstract class Savor<T> {
 			case EQ:
 				return Helper.newHashMap(this.table().apply(param.getValue()), params);
 			case IN:
-				return ((Collection<?>) param.getValue())
-								.stream()
-								.map(e -> Tuple.tuple(this.table().apply(e), e))
-								.collect(Collectors.groupingBy(Tuple::getX))
-								.entrySet()
-								.stream()
-								.collect(Collectors.toMap(Map.Entry::getKey, e -> {
-									Map<String, List<Param>> result = Maps.newHashMap(params);
-									result.put(property.getName(),
-													Lists.newArrayList(new Param(property,
-																	Param.OP.IN,
-																	e.getValue().stream().map(Tuple::getY)
-																					.collect(Collectors.toList()))));
-									return result;
-								}));
+				return ((Collection<?>) param.getValue()).stream().map(e -> Tuple.tuple(this.table().apply(e), e))
+						.collect(Collectors.groupingBy(Tuple::getX)).entrySet().stream()
+						.collect(Collectors.toMap(Map.Entry::getKey, e -> {
+							Map<String, List<Param>> result = Maps.newHashMap(params);
+							result.put(property.getName(), Lists.newArrayList(new Param(property, Param.OP.IN,
+									e.getValue().stream().map(Tuple::getY).collect(Collectors.toList()))));
+							return result;
+						}));
 			default:
 				return this.tables().stream().collect(Collectors.toMap(t -> t, t -> params));
 			}
@@ -273,7 +267,7 @@ public abstract class Savor<T> {
 		}
 
 		public static Map<String, Object> paramValueMap(Map<String, List<Param>> params,
-						Map<String, List<Value>> values) {
+				Map<String, List<Value>> values) {
 			Map<String, Object> paramMap = Maps.newHashMap();
 			params.forEach((key, value) -> value.forEach(v -> paramMap.put(v.getVName(), v.getValue())));
 			values.forEach((key, value) -> value.forEach(v -> paramMap.put(v.getVName(), v.getValue())));
@@ -356,10 +350,8 @@ public abstract class Savor<T> {
 				}
 				if (isArray(value)) {
 					if (op != Param.OP.IN && op != Param.OP.EQ) {
-						result.getOrDefault(p.getName(), Lists.newArrayList()).add(
-										new Param(p, Param.OP.EQ, value.getClass().isArray()
-														? Arrays.asList((Object[]) value)
-														: value));
+						result.getOrDefault(p.getName(), Lists.newArrayList()).add(new Param(p, Param.OP.EQ,
+								value.getClass().isArray() ? Arrays.asList((Object[]) value) : value));
 					}
 					logger.error("invalid syntax:{}", key);
 					throw new RuntimeException("invalid syntax:" + key);
@@ -401,104 +393,79 @@ public abstract class Savor<T> {
 	 */
 	public static class SqlHelper {
 
-		public static <T> SqlParams insert(Model model, String table, List<T> objs) {
+		public static <T> SqlParams insert(Model model, String table, List<T> objs, boolean ignore) {
 			StringBuilder sql = new StringBuilder();
-			sql.append("insert ignore into ")
-							.append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
-							.append("\n")
-							.append(" (")
-							.append(Joiner.on(",")
-											.join(model.getInsertProperties().stream()
-															.map(Property::getColumn)
-															.collect(Collectors.toList())))
-							.append(") ")
-							.append("\n")
-							.append("values")
-							.append("\n")
-							.append(Joiner.on(",\n").join(
-											IntStream.range(0, objs.size()).boxed()
-															.map(i -> "(" +
-																			Joiner.on(",").join(model
-																							.getInsertProperties()
-																							.stream()
-																							.map(p -> ":" + p.getName()
-																											+ i)
-																							.collect(Collectors
-																											.toList()))
-																			+
-																			")")
-															.collect(Collectors.toList())));
+			sql.append("insert");
+			if (ignore) {
+				sql.append(" ignore	 ");
+			}
+			sql.append(" into ").append(Strings.isNullOrEmpty(table) ? model.getTable() : table).append("\n")
+					.append(" (")
+					.append(Joiner.on(",").join(
+							model.getInsertProperties().stream().map(Property::getColumn).collect(Collectors.toList())))
+					.append(") ").append("\n").append("values").append("\n")
+					.append(Joiner.on(",\n").join(IntStream
+							.range(0, objs.size()).boxed().map(
+									i -> "(" + Joiner.on(",")
+											.join(model.getInsertProperties().stream().map(p -> ":" + p.getName() + i)
+													.collect(Collectors.toList()))
+											+ ")")
+							.collect(Collectors.toList())));
 			Map<String, Object> params = Maps.newHashMap();
 			IntStream.range(0, objs.size()).boxed().forEach(i -> model.getInsertProperties()
-							.forEach(p -> params.put(p.getName() + i, p.getOrInsertDef(objs.get(i)))));
+					.forEach(p -> params.put(p.getName() + i, p.getOrInsertDef(objs.get(i)))));
 			return SqlParams.model(sql, params);
 		}
 
-		public static <T> SqlParams upsert(Model model, String table, T obj, List<String> exprs) {
+		public static <T> SqlParams insert(Model model, String table, List<T> objs) {
+			return SqlHelper.insert(model, table, objs, true);
+		}
+
+		public static <T> SqlParams upsert(Model model, String table, List<T> objs, List<String> exprs) {
 			if ((exprs == null || exprs.isEmpty()) && model.getUpdateTimeProperties().isEmpty()) {
-				return insert(model, table, Lists.newArrayList(obj));
+				return SqlHelper.insert(model, table, objs);
 			}
-			StringBuilder sql = new StringBuilder();
+			SqlParams sqlParams = SqlHelper.insert(model, table, objs, false);
 			exprs = exprs == null ? Lists.newArrayList() : Lists.newArrayList(exprs);
 			exprs.addAll(model.getUpdateTimeProperties().stream()
-							.map(p -> p.getColumn() + " = :" + p.getName() + NEW_VALUE_SUFFIX)
-							.collect(Collectors.toList()));
-			sql.append("insert into ")
-							.append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
-							.append("\n")
-							.append(" (")
-							.append(Joiner.on(",")
-											.join(model.getInsertProperties().stream()
-															.map(Property::getColumn)
-															.collect(Collectors.toList())))
-							.append(")\nvalues\n(")
-							.append(Joiner.on(",")
-											.join(model.getInsertProperties().stream().map(e -> ":" + e.getName())
-															.collect(Collectors.toList())))
-							.append(")\n ")
-							.append("  on duplicate x update ")
-							.append(Joiner.on(",").join(
-											exprs.stream().sorted().collect(Collectors.toList())));
-			Map<String, Object> params = Maps.newHashMap();
-			model.getInsertProperties().forEach(p -> params.put(p.getName(), p.getOrInsertDef(obj)));
+					.map(p -> p.getColumn() + " = :" + p.getName() + NEW_VALUE_SUFFIX).collect(Collectors.toList()));
+			sqlParams.getSql().append(" on duplicate key update ")
+					.append(Joiner.on(",").join(exprs.stream().sorted().collect(Collectors.toList())));
+
+			Map<String, Object> params = sqlParams.getParams();
 			model.getUpdateTimeProperties()
-							.forEach(p -> params.putIfAbsent(p.getName() + NEW_VALUE_SUFFIX, p.getOrUpdateDef(obj)));
-			return SqlParams.model(sql, params);
+					.forEach(p -> params.putIfAbsent(p.getName() + NEW_VALUE_SUFFIX, p.getUpdateDef().get()));
+			return sqlParams;
 		}
 
 		public static SqlParams delete(Model model, String table, Map<String, List<Param>> params) {
 			StringBuilder sql = new StringBuilder();
-			sql.append("delete from ")
-							.append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
-							.append("\n")
-							.append(SqlHelper.where(params));
+			sql.append("delete from ").append(Strings.isNullOrEmpty(table) ? model.getTable() : table).append("\n")
+					.append(SqlHelper.where(params));
 			return SqlParams.model(sql, Helper.paramMap(params));
 		}
 
 		public static SqlParams update(Model model, String table, Map<String, List<Value>> values,
-						Map<String, List<Param>> params) {
+				Map<String, List<Param>> params) {
 			if (CollectionUtils.isEmpty(values) && model.getUpdateTimeProperties().isEmpty()) {
 				logger.error("invalid syntax");
 				throw new RuntimeException("invalid syntax");
 			}
 			model.getUpdateTimeProperties().forEach(p -> values.putIfAbsent(p.getName(),
-							Lists.newArrayList(new Value(p, null, p.getUpdateDef().get()))));
+					Lists.newArrayList(new Value(p, null, p.getUpdateDef().get()))));
 			StringBuilder sql = new StringBuilder();
-			sql.append("update ")
-							.append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
-							.append("\n")
-							.append(" set ")
-							.append(Joiner.on(",").join(
-											values.entrySet().stream().flatMap(e -> e.getValue().stream())
-															.sorted(Comparator.comparing(Value::getVName))
-															.map(Value::getExpr).collect(Collectors.toList())))
-							.append("\n")
-							.append(SqlHelper.where(params));
+			sql.append("update ").append(Strings.isNullOrEmpty(table) ? model.getTable() : table).append("\n")
+					.append(" set ")
+					.append(Joiner.on(",")
+							.join(values.entrySet().stream().flatMap(e -> e.getValue().stream())
+									.sorted(Comparator.comparing(Value::getVName)).map(Value::getExpr)
+									.collect(Collectors.toList())))
+					.append("\n").append(SqlHelper.where(params));
 			return SqlParams.model(sql, Helper.paramValueMap(params, values));
 		}
 
 		public static SqlParams select(Model model, String table, List<String> names, Map<String, List<Param>> params,
-						List<String> orderExprs, Integer offset, Integer limit) {
+				List<String> orderExprs, Integer offset, Integer limit) {
 			StringBuilder sql = new StringBuilder();
 			sql.append("select ");
 			if (names == null || names.isEmpty()) {
@@ -512,18 +479,17 @@ public abstract class Savor<T> {
 					return property.getColumn();
 				}).collect(Collectors.toList())));
 			}
-			sql.append(" from ")
-							.append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
-							.append(SqlHelper.where(params));
+			sql.append(" from ").append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
+					.append(SqlHelper.where(params));
 			if (orderExprs != null && !orderExprs.isEmpty()) {
 				sql.append(" order by ")
-								.append(Joiner.on(",").join(orderExprs.stream().map(String::trim).sorted().map(e -> {
-									Property p = model.getProperty(e);
-									if (p == null) {
-										return e;
-									}
-									return p.getColumn();
-								}).collect(Collectors.toList())));
+						.append(Joiner.on(",").join(orderExprs.stream().map(String::trim).sorted().map(e -> {
+							Property p = model.getProperty(e);
+							if (p == null) {
+								return e;
+							}
+							return p.getColumn();
+						}).collect(Collectors.toList())));
 			}
 			if (offset != null) {
 				sql.append(" limit ").append(offset).append(",").append(limit == null ? 1 : limit);
@@ -537,10 +503,8 @@ public abstract class Savor<T> {
 			if (params == null || params.isEmpty()) {
 				return "";
 			}
-			return " where " + Joiner.on(" \nand ").join(
-							params.entrySet().stream().flatMap(e -> e.getValue().stream())
-											.sorted(Comparator.comparing(Param::getVName))
-											.map(Param::getExpr).collect(Collectors.toList()));
+			return " where " + Joiner.on(" \nand ").join(params.entrySet().stream().flatMap(e -> e.getValue().stream())
+					.sorted(Comparator.comparing(Param::getVName)).map(Param::getExpr).collect(Collectors.toList()));
 		}
 
 	}
@@ -584,12 +548,10 @@ public abstract class Savor<T> {
 			this.name = clazz.getSimpleName();
 			this.table = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, this.name);
 			this.properties = Collections.unmodifiableList(Arrays.stream(clazz.getDeclaredFields())
-							.filter(f -> !Modifier.isStatic(f.getModifiers())
-											&& !Modifier.isFinal(f.getModifiers()))
-							.map(Property::new).collect(Collectors.toList()));
+					.filter(f -> !Modifier.isStatic(f.getModifiers()) && !Modifier.isFinal(f.getModifiers()))
+					.map(Property::new).collect(Collectors.toList()));
 			this.propertyMap = Collections
-							.unmodifiableMap(properties.stream()
-											.collect(Collectors.toMap(Property::getName, p -> p)));
+					.unmodifiableMap(properties.stream().collect(Collectors.toMap(Property::getName, p -> p)));
 //            this.tableProperties = Collections.unmodifiableList(Arrays.stream(clazz.getDeclaredFields())
 //                    .filter(f -> f.getAnnotation(TableKey.class) != null)
 //                    .map(f -> Tuple.tuple(f.getName(), f.getAnnotation(TableKey.class).index()))
@@ -597,15 +559,13 @@ public abstract class Savor<T> {
 //                    .map(tuple -> this.getProperty(tuple.getX()))
 //                    .collect(Collectors.toList()));
 			String tableKey = clazz.getAnnotation(TableKey.class) != null ? clazz.getAnnotation(TableKey.class).name()
-							: "";
+					: "";
 			this.tableKeyProperty = Strings.isNullOrEmpty(tableKey) ? null : this.getProperty(tableKey);
-			this.updateTimeProperties = Collections.unmodifiableList(Arrays.stream(clazz.getDeclaredFields())
-							.filter(f -> f.getAnnotation(TimeUpdate.class) != null)
-							.map(f -> this.getProperty(f.getName()))
-							.collect(Collectors.toList()));
-			this.insertProperties = Collections.unmodifiableList(properties.stream()
-							.filter(Property::isInsertable)
-							.collect(Collectors.toList()));
+			this.updateTimeProperties = Collections.unmodifiableList(
+					Arrays.stream(clazz.getDeclaredFields()).filter(f -> f.getAnnotation(TimeUpdate.class) != null)
+							.map(f -> this.getProperty(f.getName())).collect(Collectors.toList()));
+			this.insertProperties = Collections
+					.unmodifiableList(properties.stream().filter(Property::isInsertable).collect(Collectors.toList()));
 		}
 
 		@SuppressWarnings("checkstyle:HiddenField")
@@ -640,8 +600,7 @@ public abstract class Savor<T> {
 			this.column = CaseFormat.LOWER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, f.getName());
 			this.type = f.getType();
 			this.primaryKey = f.getAnnotation(PrimaryKey.class) != null;
-			this.insertable = f.getAnnotation(PrimaryKey.class) == null
-							|| f.getAnnotation(PrimaryKey.class).insert();
+			this.insertable = f.getAnnotation(PrimaryKey.class) == null || f.getAnnotation(PrimaryKey.class).insert();
 			this.insertDef = ModelHelper.insertDef(f);
 			this.updateDef = ModelHelper.updateDef(f);
 		}
