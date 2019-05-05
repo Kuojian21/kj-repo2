@@ -196,7 +196,7 @@ public abstract class Savor<T> {
 		if (property == null) {
 			return this.model.getTable();
 		}
-		return this.table().apply(obj);
+		return this.table().apply(property.getOrInsertDef(obj));
 	}
 
 	protected Map<String, List<T>> table(List<T> objs) {
@@ -267,13 +267,6 @@ public abstract class Savor<T> {
 				result.put((K) objs[i], (V) objs[i + 1]);
 			}
 			return result;
-		}
-
-		public static boolean isArray(Object obj) {
-			if (obj == null) {
-				return false;
-			}
-			return obj instanceof Collection || obj.getClass().isArray();
 		}
 
 		public static Map<String, Object> paramMap(Map<String, List<Param>> params) {
@@ -378,32 +371,6 @@ public abstract class Savor<T> {
 			});
 			return result;
 		}
-
-		public static <T> List<List<T>> cartesian(List<List<T>> objs) {
-			List<List<T>> result = Lists.newArrayList();
-			int size = objs.size();
-			List<List<T>> tObjs = objs.stream().map(Lists::newArrayList).collect(Collectors.toList());
-			while (tObjs.size() > 0) {
-				result.add(tObjs.stream().map(x -> x.get(0)).collect(Collectors.toList()));
-				tObjs.get(size - 1).remove(0);
-				for (int i = size - 1; i >= 0; i--) {
-					if (tObjs.get(i).size() > 0) {
-						for (int j = i + 1; j < size; j++) {
-							tObjs.add(Lists.newArrayList(objs.get(j)));
-						}
-						break;
-					} else {
-						if (i == 0) {
-							return result;
-						}
-						tObjs.get(i - 1).remove(0);
-						tObjs.remove(i);
-					}
-				}
-			}
-			return result;
-		}
-
 	}
 
 	/**
@@ -417,8 +384,7 @@ public abstract class Savor<T> {
 			if (ignore) {
 				sql.append(" ignore	 ");
 			}
-			sql.append(" into ").append(Strings.isNullOrEmpty(table) ? model.getTable() : table).append("\n")
-					.append(" (")
+			sql.append(" into ").append(table).append("\n").append(" (")
 					.append(Joiner.on(",").join(
 							model.getInsertProperties().stream().map(Property::getColumn).collect(Collectors.toList())))
 					.append(") ").append("\n").append("values").append("\n")
@@ -448,20 +414,18 @@ public abstract class Savor<T> {
 
 		public static SqlParams delete(Model model, String table, Map<String, List<Param>> params) {
 			StringBuilder sql = new StringBuilder();
-			sql.append("delete from ").append(Strings.isNullOrEmpty(table) ? model.getTable() : table).append("\n")
-					.append(SqlHelper.where(params));
+			sql.append("delete from ").append(table).append("\n").append(SqlHelper.where(params));
 			return SqlParams.model(sql, Helper.paramMap(params));
 		}
 
 		public static SqlParams update(Model model, String table, Map<String, Value> values,
 				Map<String, List<Param>> params) {
-			if (CollectionUtils.isEmpty(values) && model.getUpdateTimeProperties().isEmpty()) {
+			if (CollectionUtils.isEmpty(values)) {
 				logger.error("invalid syntax");
 				throw new RuntimeException("invalid syntax");
 			}
 			StringBuilder sql = new StringBuilder();
-			sql.append("update ").append(Strings.isNullOrEmpty(table) ? model.getTable() : table).append("\n")
-					.append(" set ")
+			sql.append("update ").append(table).append("\n").append(" set ")
 					.append(Joiner.on(",")
 							.join(values.values().stream().sorted(Comparator.comparing(Value::getVName))
 									.map(Value::getExpr).collect(Collectors.toList())))
@@ -473,7 +437,7 @@ public abstract class Savor<T> {
 				List<String> orderExprs, Integer offset, Integer limit) {
 			StringBuilder sql = new StringBuilder();
 			sql.append("select ");
-			if (names == null || names.isEmpty()) {
+			if (CollectionUtils.isEmpty(names)) {
 				sql.append("*");
 			} else {
 				sql.append(Joiner.on(",").join(Lists.newArrayList(names).stream().map(String::trim).sorted().map(n -> {
@@ -485,7 +449,7 @@ public abstract class Savor<T> {
 				}).collect(Collectors.toList())));
 			}
 			sql.append(" from ").append(table).append(SqlHelper.where(params));
-			if (orderExprs != null && !orderExprs.isEmpty()) {
+			if (!CollectionUtils.isEmpty(orderExprs)) {
 				sql.append(" order by ")
 						.append(Joiner.on(",").join(orderExprs.stream().map(String::trim).sorted().map(e -> {
 							Property p = model.getProperty(e);
@@ -659,45 +623,6 @@ public abstract class Savor<T> {
 	@Retention(RetentionPolicy.RUNTIME)
 	public @interface TimeUpdate {
 		String value() default "";
-	}
-
-	/**
-	 * @author kuojian21
-	 */
-	@Data
-	public static class Cartesian<T> {
-		private final List<List<T>> objs;
-		private final int size;
-		private final List<List<T>> result;
-		private final List<List<T>> tObjs;
-
-		public Cartesian(List<List<T>> objs) {
-			this.objs = objs;
-			this.size = objs.size();
-			this.result = Lists.newArrayList();
-			this.tObjs = objs.stream().map(Lists::newArrayList).collect(Collectors.toList());
-			this.handle();
-		}
-
-		public void handle() {
-			List<T> t = Lists.newArrayList();
-			for (int i = 0; i < size; i++) {
-				t.add(tObjs.get(i).get(0));
-			}
-			result.add(t);
-			for (int i = size - 1; i >= 0; i--) {
-				tObjs.get(i).remove(0);
-				if (tObjs.get(i).size() > 0) {
-					for (int j = i + 1; j < size; j++) {
-						tObjs.add(Lists.newArrayList(objs.get(j)));
-					}
-					this.handle();
-					return;
-				} else {
-					tObjs.remove(i);
-				}
-			}
-		}
 	}
 
 	/**
