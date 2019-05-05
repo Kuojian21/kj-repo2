@@ -79,8 +79,8 @@ public abstract class Savor<T> {
 		if (objs == null || objs.isEmpty()) {
 			return 0;
 		}
-		return this.update(
-				this.table(objs).entrySet().stream().map(e -> SqlHelper.insert(this.model, e.getKey(), e.getValue())));
+		return this.update(this.table(objs).entrySet().stream()
+				.map(e -> SqlHelper.insert(this.model, e.getKey(), e.getValue(), true)));
 	}
 
 	public int upsert(List<T> objs, List<String> updateExprs) {
@@ -149,9 +149,13 @@ public abstract class Savor<T> {
 		if (property == null) {
 			return Helper.newHashMap(this.model.getTable(), params);
 		}
-		List<Param> paramList = params.remove(property.getName());
+		List<Param> paramList = params.get(property.getName());
 		if (paramList == null) {
-			return Helper.newHashMap(this.table().apply(null), params);
+			String table = this.table().apply(null);
+			if (!Strings.isNullOrEmpty(table)) {
+				return Helper.newHashMap(table, params);
+			}
+			return this.tables().stream().collect(Collectors.toMap(t -> t, t -> params));
 		} else if (paramList.size() == 1) {
 			Param param = paramList.get(0);
 			switch (param.op) {
@@ -339,22 +343,23 @@ public abstract class Savor<T> {
 						op = Param.OP.NE;
 						break;
 					case "IN":
-						op = Param.OP.IN;
 					case "=":
 					case "EQ":
+						if (value != null && (value instanceof Collection || value.getClass().isArray())) {
+							op = Param.OP.IN;
+						} else {
+							op = Param.OP.EQ;
+						}
 						break;
 					default:
 						logger.error("invalid syntax:{}", key);
 						throw new RuntimeException("invalid syntax:" + key);
 					}
 				}
-				if (isArray(value)) {
-					if (op != Param.OP.IN && op != Param.OP.EQ) {
-						result.getOrDefault(p.getName(), Lists.newArrayList()).add(new Param(p, Param.OP.EQ,
-								value.getClass().isArray() ? Arrays.asList((Object[]) value) : value));
-					}
-					logger.error("invalid syntax:{}", key);
-					throw new RuntimeException("invalid syntax:" + key);
+				if (op == Param.OP.IN && value.getClass().isArray()) {
+					result.getOrDefault(p.getName(), Lists.newArrayList())
+							.add(new Param(p, Param.OP.IN, Arrays.asList((Object[]) value)));
+					return;
 				}
 				result.getOrDefault(p.getName(), Lists.newArrayList()).add(new Param(p, op, value));
 			});
@@ -417,13 +422,9 @@ public abstract class Savor<T> {
 			return SqlParams.model(sql, params);
 		}
 
-		public static <T> SqlParams insert(Model model, String table, List<T> objs) {
-			return SqlHelper.insert(model, table, objs, true);
-		}
-
 		public static <T> SqlParams upsert(Model model, String table, List<T> objs, List<String> exprs) {
 			if ((exprs == null || exprs.isEmpty()) && model.getUpdateTimeProperties().isEmpty()) {
-				return SqlHelper.insert(model, table, objs);
+				return SqlHelper.insert(model, table, objs, true);
 			}
 			SqlParams sqlParams = SqlHelper.insert(model, table, objs, false);
 			exprs = exprs == null ? Lists.newArrayList() : Lists.newArrayList(exprs);
@@ -452,7 +453,7 @@ public abstract class Savor<T> {
 				throw new RuntimeException("invalid syntax");
 			}
 			model.getUpdateTimeProperties().forEach(p -> values.putIfAbsent(p.getName(),
-					Lists.newArrayList(new Value(p, null, p.getUpdateDef().get()))));
+					Lists.newArrayList(new Value(p, Value.OP.EQ, p.getUpdateDef().get()))));
 			StringBuilder sql = new StringBuilder();
 			sql.append("update ").append(Strings.isNullOrEmpty(table) ? model.getTable() : table).append("\n")
 					.append(" set ")
@@ -479,8 +480,7 @@ public abstract class Savor<T> {
 					return property.getColumn();
 				}).collect(Collectors.toList())));
 			}
-			sql.append(" from ").append(Strings.isNullOrEmpty(table) ? model.getTable() : table)
-					.append(SqlHelper.where(params));
+			sql.append(" from ").append(table).append(SqlHelper.where(params));
 			if (orderExprs != null && !orderExprs.isEmpty()) {
 				sql.append(" order by ")
 						.append(Joiner.on(",").join(orderExprs.stream().map(String::trim).sorted().map(e -> {
@@ -603,19 +603,6 @@ public abstract class Savor<T> {
 			this.insertable = f.getAnnotation(PrimaryKey.class) == null || f.getAnnotation(PrimaryKey.class).insert();
 			this.insertDef = ModelHelper.insertDef(f);
 			this.updateDef = ModelHelper.updateDef(f);
-		}
-
-		public Object getOrUpdateDef(Object obj) {
-			try {
-				Object rtn = this.field.get(obj);
-				if (rtn == null) {
-					return this.updateDef.get();
-				}
-				return rtn;
-			} catch (IllegalArgumentException | IllegalAccessException e) {
-				logger.error("", e);
-				return null;
-			}
 		}
 
 		public Object getOrInsertDef(Object obj) {
