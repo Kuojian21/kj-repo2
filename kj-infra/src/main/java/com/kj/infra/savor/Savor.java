@@ -513,22 +513,18 @@ public abstract class Savor<T> {
 
 		public Model(Class<?> clazz) {
 			super();
+			Table tTable = clazz.getAnnotation(Table.class);
 			this.name = clazz.getSimpleName();
-			this.table = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, this.name);
+			this.table = (tTable != null && !Strings.isNullOrEmpty(tTable.name())) ? tTable.name()
+					: CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, this.name);
 			this.properties = Collections.unmodifiableList(Arrays.stream(clazz.getDeclaredFields())
 					.filter(f -> !Modifier.isStatic(f.getModifiers()) && !Modifier.isFinal(f.getModifiers()))
 					.map(Property::new).collect(Collectors.toList()));
 			this.propertyMap = Collections
 					.unmodifiableMap(properties.stream().collect(Collectors.toMap(Property::getName, p -> p)));
-//            this.tableProperties = Collections.unmodifiableList(Arrays.stream(clazz.getDeclaredFields())
-//                    .filter(f -> f.getAnnotation(TableKey.class) != null)
-//                    .map(f -> Tuple.tuple(f.getName(), f.getAnnotation(TableKey.class).index()))
-//                    .sorted(Comparator.comparing(Tuple::getY))
-//                    .map(tuple -> this.getProperty(tuple.getX()))
-//                    .collect(Collectors.toList()));
-			String tableKey = clazz.getAnnotation(TableKey.class) != null ? clazz.getAnnotation(TableKey.class).name()
-					: "";
-			this.tableKeyProperty = Strings.isNullOrEmpty(tableKey) ? null : this.getProperty(tableKey);
+			this.tableKeyProperty = (tTable != null && !Strings.isNullOrEmpty(tTable.key()))
+					? this.getProperty(tTable.key())
+					: null;
 			this.updateTimeProperties = Collections.unmodifiableList(
 					Arrays.stream(clazz.getDeclaredFields()).filter(f -> f.getAnnotation(TimeUpdate.class) != null)
 							.map(f -> this.getProperty(f.getName())).collect(Collectors.toList()));
@@ -591,20 +587,21 @@ public abstract class Savor<T> {
 	/**
 	 * @author kuojian21
 	 */
-	@Target(ElementType.FIELD)
+	@Target(ElementType.TYPE)
 	@Retention(RetentionPolicy.RUNTIME)
-	public @interface PrimaryKey {
-		boolean insert() default false;
+	public @interface Table {
+		String name() default "";
+
+		String key() default "";
 	}
 
 	/**
 	 * @author kuojian21
 	 */
-	@Target(ElementType.TYPE)
+	@Target(ElementType.FIELD)
 	@Retention(RetentionPolicy.RUNTIME)
-	public @interface TableKey {
-		// int index() default 0;
-		String name() default "";
+	public @interface PrimaryKey {
+		boolean insert() default false;
 	}
 
 	/**

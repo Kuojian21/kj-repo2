@@ -15,6 +15,7 @@ import org.springframework.jdbc.datasource.SimpleDriverDataSource;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Lists;
+import com.kj.infra.algorithm.Algorithm;
 import com.kj.infra.savor.Savor;
 import com.kj.infra.savor.Savor.TimeInsert;
 import com.kj.infra.savor.Savor.TimeUpdate;
@@ -35,10 +36,8 @@ public class TeSavor {
 	}
 
 	public static void cartesian(String[] args) {
-		List<List<Integer>> result = Savor.Helper.cartesian(Lists.newArrayList(
-						Lists.newArrayList(1, 2, 3, 4),
-						Lists.newArrayList(5, 6, 7, 8),
-						Lists.newArrayList(9, 10, 11, 12)));
+		List<List<Integer>> result = Algorithm.cartesian(Lists.newArrayList(Lists.newArrayList(1, 2, 3, 4),
+				Lists.newArrayList(5, 6, 7, 8), Lists.newArrayList(9, 10, 11, 12)));
 		for (List<Integer> l : result) {
 			System.out.println(l);
 		}
@@ -47,10 +46,8 @@ public class TeSavor {
 	public static void testSet(String[] args) {
 		Map<String, Object> map = Savor.Helper.newHashMap("sss", null);
 
-		System.out.println(map.entrySet().stream().map(Map.Entry::getValue)
-						.collect(Collectors.toList()));
-		map.entrySet().stream()
-						.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+		System.out.println(map.entrySet().stream().map(Map.Entry::getValue).collect(Collectors.toList()));
+		map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 	}
 
 	public static void code(String[] args) throws SQLException {
@@ -71,30 +68,27 @@ public class TeSavor {
 //						update_time timestamp default now() comment '创建时间'
 //					)ENGINE=INNODB DEFAULT CHARSET=UTF8MB4;
 		SavorHelper.Model model = SavorHelper.mysql(new SimpleDriverDataSource(new Driver(), args[0], args[1], args[2]),
-						args[3]);
+				args[3]);
 		SavorHelper.code(model);
 	}
 
 	public static void sql() throws Exception {
 		System.out.println(Savor.SqlHelper.insert(Savor.ModelHelper.model(SavorBaseTest.class), null,
-						Lists.newArrayList(new SavorBaseTest(), new SavorBaseTest())));
-		System.out.println(
-						Savor.SqlHelper.upsert(Savor.ModelHelper.model(SavorBaseTest.class), null, new SavorBaseTest(),
-										Lists.newArrayList("name=value(name)")));
+				Lists.newArrayList(new SavorBaseTest(), new SavorBaseTest()), false));
+		System.out.println(Savor.SqlHelper.upsert(Savor.ModelHelper.model(SavorBaseTest.class), null,
+				Lists.newArrayList(new SavorBaseTest(), new SavorBaseTest()),
+				Savor.Helper.newHashMap("name", "values(name)")));
 		System.out.println(Savor.SqlHelper.delete(Savor.ModelHelper.model(SavorBaseTest.class), null,
-						Savor.Helper.newHashMap("id", 100)));
+				Savor.Helper.newHashMap("id", 100)));
 		System.out.println(Savor.SqlHelper.update(Savor.ModelHelper.model(SavorBaseTest.class), null,
-						Savor.Helper.newHashMap("name", "kj"),
-						Savor.Helper.newHashMap("id", 100)));
-		System.out.println(
-						Savor.SqlHelper.select(Savor.ModelHelper.model(SavorBaseTest.class), null, null,
-										Savor.Helper.newHashMap("id#lt", 100),
-										null, null, null));
+				Savor.Helper.newHashMap("name", "kj"), Savor.Helper.newHashMap("id", 100)));
+		System.out.println(Savor.SqlHelper.select(Savor.ModelHelper.model(SavorBaseTest.class), null, null,
+				Savor.Helper.newHashMap("id#lt", 100), null, null, null));
 	}
 
 	public static void test(String[] args) throws SQLException {
 		SavorBaseTestDao dao = new SavorBaseTestDao(
-						new SimpleDriverDataSource(new Driver(), args[0], args[1], args[2]));
+				new SimpleDriverDataSource(new Driver(), args[0], args[1], args[2]));
 //		/**
 //		 * test insert def
 //		 */
@@ -110,9 +104,8 @@ public class TeSavor {
 //		 * test delete
 //		 */
 		dao.delete(Savor.Helper.newHashMap("id", 1));
-		IntStream.range(0, 10).boxed()
-						.forEach(i -> dao.update(Savor.Helper.newHashMap("name", "kj"),
-										Savor.Helper.newHashMap("id", new Random().nextInt(100))));
+		IntStream.range(0, 10).boxed().forEach(i -> dao.update(Savor.Helper.newHashMap("name", "kj"),
+				Savor.Helper.newHashMap("id", new Random().nextInt(100))));
 		log.info("{}", dao.select(Savor.Helper.newHashMap("name", "kj")));
 		log.info("{}", dao.select(Savor.Helper.newHashMap("id#le", 10)));
 		log.info("{}", dao.select(Savor.Helper.newHashMap("id#ge", 90)));
