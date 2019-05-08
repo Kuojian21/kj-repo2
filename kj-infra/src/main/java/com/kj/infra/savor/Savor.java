@@ -16,7 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -49,16 +49,20 @@ public abstract class Savor<T> {
 	private final Class<T> clazz;
 	private final RowMapper<T> rowMapper;
 	private final Model model;
+	private final ShardHolder defReaderShard;
+	private final ShardHolder defWriterShard;
 
 	@SuppressWarnings("unchecked")
 	protected Savor() {
 		clazz = (Class<T>) (((ParameterizedType) this.getClass().getGenericSuperclass()).getActualTypeArguments()[0]);
 		rowMapper = new BeanPropertyRowMapper<>(clazz);
 		model = ModelHelper.model(clazz);
+		defReaderShard = new ShardHolder(this.getReader(), this.model.table);
+		defWriterShard = new ShardHolder(this.getWriter(), this.model.table);
 	}
 
 	public int update(SqlParams sqlParams) {
-		return this.getWriter().update(sqlParams.getSql().toString(), sqlParams.getParams());
+		return sqlParams.jdbcTemplate.update(sqlParams.getSql().toString(), sqlParams.getParams());
 	}
 
 	public int update(Stream<SqlParams> stream) {
@@ -67,7 +71,7 @@ public abstract class Savor<T> {
 
 	@SuppressWarnings("checkstyle:HiddenField")
 	public <R> List<R> select(SqlParams sqlParams, RowMapper<R> rowMapper) {
-		return this.getReader().query(sqlParams.getSql().toString(), sqlParams.getParams(), rowMapper);
+		return sqlParams.jdbcTemplate.query(sqlParams.getSql().toString(), sqlParams.getParams(), rowMapper);
 	}
 
 	@SuppressWarnings("checkstyle:HiddenField")
@@ -79,7 +83,7 @@ public abstract class Savor<T> {
 		if (objs == null || objs.isEmpty()) {
 			return 0;
 		}
-		return this.update(this.table(objs).entrySet().stream()
+		return this.update(this.shard(objs).entrySet().stream()
 				.map(e -> SqlHelper.insert(this.model, e.getKey(), e.getValue(), true)));
 	}
 
@@ -99,17 +103,17 @@ public abstract class Savor<T> {
 		if (objs == null || objs.isEmpty()) {
 			return 0;
 		}
-		return this.update(this.table(objs).entrySet().stream().map(e -> SqlHelper.upsert(this.model, e.getKey(),
+		return this.update(this.shard(objs).entrySet().stream().map(e -> SqlHelper.upsert(this.model, e.getKey(),
 				e.getValue(), Helper.initValues(this.model, values, true))));
 	}
 
 	public int delete(Map<String, Object> params) {
-		return this.update(this.table(params).entrySet().stream()
+		return this.update(this.shard(params, true).entrySet().stream()
 				.map(e -> SqlHelper.delete(this.model, e.getKey(), e.getValue())));
 	}
 
 	public int update(Map<String, Object> values, Map<String, Object> params) {
-		return this.update(this.table(params).entrySet().stream()
+		return this.update(this.shard(params, true).entrySet().stream()
 				.map(e -> SqlHelper.update(model, e.getKey(), Helper.initValues(model, values, false), e.getValue())));
 	}
 
@@ -130,7 +134,7 @@ public abstract class Savor<T> {
 	public <R> List<R> select(List<String> names, Map<String, Object> params, List<String> orderExprs, Integer offset,
 			Integer limit, RowMapper<R> rowMapper) {
 		return this.select(
-				this.table(params).entrySet().stream().map(
+				this.shard(params, false).entrySet().stream().map(
 						e -> SqlHelper.select(this.model, e.getKey(), names, e.getValue(), orderExprs, offset, limit)),
 				rowMapper);
 	}
@@ -147,34 +151,35 @@ public abstract class Savor<T> {
 		return rowMapper;
 	}
 
-	protected Function<Object, String> table() {
+	protected BiFunction<Object, Boolean, ShardHolder> shard() {
 		throw new RuntimeException("not supported");
 	}
 
-	protected List<String> tables() {
+	protected List<ShardHolder> shards(boolean update) {
 		throw new RuntimeException("not supported");
 	}
 
-	protected Map<String, Map<String, List<Param>>> table(Map<String, Object> paramMap) {
-		Property property = this.model.getTableKeyProperty();
+	protected Map<ShardHolder, Map<String, List<Param>>> shard(Map<String, Object> paramMap, boolean update) {
 		Map<String, List<Param>> params = Helper.initParams(this.model, paramMap);
+		Property property = this.model.getShardProperty();
 		if (property == null) {
-			return Helper.newHashMap(this.model.getTable(), params);
+			return Helper.newHashMap(update ? this.defWriterShard : this.defReaderShard, params);
 		}
 		List<Param> paramList = params.get(property.getName());
 		if (paramList == null) {
-			String table = this.table().apply(null);
-			if (!Strings.isNullOrEmpty(table)) {
-				return Helper.newHashMap(table, params);
+			ShardHolder holder = this.shard().apply(null, update);
+			if (holder != null) {
+				return Helper.newHashMap(holder, params);
 			}
-			return this.tables().stream().collect(Collectors.toMap(t -> t, t -> params));
+			return this.shards(update).stream().collect(Collectors.toMap(t -> t, t -> params));
 		} else if (paramList.size() == 1) {
 			Param param = paramList.get(0);
 			switch (param.op) {
 			case EQ:
-				return Helper.newHashMap(this.table().apply(param.getValue()), params);
+				return Helper.newHashMap(this.shard().apply(param.getValue(), update), params);
 			case IN:
-				return ((Collection<?>) param.getValue()).stream().map(e -> Tuple.tuple(this.table().apply(e), e))
+				return ((Collection<?>) param.getValue()).stream()
+						.map(e -> Tuple.tuple(this.shard().apply(e, update), e))
 						.collect(Collectors.groupingBy(Tuple::getX)).entrySet().stream()
 						.collect(Collectors.toMap(Map.Entry::getKey, e -> {
 							Map<String, List<Param>> result = Maps.newHashMap(params);
@@ -183,30 +188,22 @@ public abstract class Savor<T> {
 							return result;
 						}));
 			default:
-				return this.tables().stream().collect(Collectors.toMap(t -> t, t -> params));
+				return this.shards(update).stream().collect(Collectors.toMap(t -> t, t -> params));
 			}
 		} else {
-			return this.tables().stream().collect(Collectors.toMap(t -> t, t -> params));
+			return this.shards(update).stream().collect(Collectors.toMap(t -> t, t -> params));
 		}
 
 	}
 
-	protected String table(T obj) {
-		Property property = this.model.getTableKeyProperty();
+	protected Map<ShardHolder, List<T>> shard(List<T> objs) {
+		Property property = this.model.getShardProperty();
 		if (property == null) {
-			return this.model.getTable();
-		}
-		return this.table().apply(property.getOrInsertDef(obj));
-	}
-
-	protected Map<String, List<T>> table(List<T> objs) {
-		Property property = this.model.getTableKeyProperty();
-		if (property == null) {
-			return Helper.newHashMap(this.model.getTable(), objs);
+			return Helper.newHashMap(this.defWriterShard, objs);
 		} else {
-			return objs.stream().collect(Collectors.groupingBy(this::table));
+			return objs.stream()
+					.collect(Collectors.groupingBy(o -> this.shard().apply(property.getOrInsertDef(o), true)));
 		}
-
 	}
 
 	public abstract NamedParameterJdbcTemplate getReader();
@@ -378,13 +375,13 @@ public abstract class Savor<T> {
 	 */
 	public static class SqlHelper {
 
-		public static <T> SqlParams insert(Model model, String table, List<T> objs, boolean ignore) {
+		public static <T> SqlParams insert(Model model, ShardHolder holder, List<T> objs, boolean ignore) {
 			StringBuilder sql = new StringBuilder();
 			sql.append("insert");
 			if (ignore) {
 				sql.append(" ignore	 ");
 			}
-			sql.append(" into ").append(table).append("\n").append(" (")
+			sql.append(" into ").append(holder.getTable()).append("\n").append(" (")
 					.append(Joiner.on(",").join(
 							model.getInsertProperties().stream().map(Property::getColumn).collect(Collectors.toList())))
 					.append(") ").append("\n").append("values").append("\n")
@@ -398,43 +395,44 @@ public abstract class Savor<T> {
 			Map<String, Object> params = Maps.newHashMap();
 			IntStream.range(0, objs.size()).boxed().forEach(i -> model.getInsertProperties()
 					.forEach(p -> params.put(p.getName() + i, p.getOrInsertDef(objs.get(i)))));
-			return SqlParams.model(sql, params);
+			return SqlParams.model(holder.template, sql, params);
 		}
 
-		public static <T> SqlParams upsert(Model model, String table, List<T> objs, Map<String, Value> values) {
+		public static <T> SqlParams upsert(Model model, ShardHolder holder, List<T> objs, Map<String, Value> values) {
 			if (CollectionUtils.isEmpty(values)) {
-				return SqlHelper.insert(model, table, objs, true);
+				return SqlHelper.insert(model, holder, objs, true);
 			}
-			SqlParams sqlParams = SqlHelper.insert(model, table, objs, false);
-			sqlParams.getSql().append(" on duplicate key update ").append(Joiner.on(",").join(values.entrySet().stream()
-					.sorted(Comparator.comparing(Map.Entry::getKey)).collect(Collectors.toList())));
+			SqlParams sqlParams = SqlHelper.insert(model, holder, objs, false);
+			sqlParams.getSql().append(" on duplicate key update ").append(
+					Joiner.on(",").join(values.entrySet().stream().sorted(Comparator.comparing(Map.Entry::getKey))
+							.map(e -> e.getValue().getExpr()).collect(Collectors.toList())));
 			Helper.valueMap(sqlParams.getParams(), values);
 			return sqlParams;
 		}
 
-		public static SqlParams delete(Model model, String table, Map<String, List<Param>> params) {
+		public static SqlParams delete(Model model, ShardHolder holder, Map<String, List<Param>> params) {
 			StringBuilder sql = new StringBuilder();
-			sql.append("delete from ").append(table).append("\n").append(SqlHelper.where(params));
-			return SqlParams.model(sql, Helper.paramMap(params));
+			sql.append("delete from ").append(holder.getTable()).append("\n").append(SqlHelper.where(params));
+			return SqlParams.model(holder.template, sql, Helper.paramMap(params));
 		}
 
-		public static SqlParams update(Model model, String table, Map<String, Value> values,
+		public static SqlParams update(Model model, ShardHolder holder, Map<String, Value> values,
 				Map<String, List<Param>> params) {
 			if (CollectionUtils.isEmpty(values)) {
 				logger.error("invalid syntax");
 				throw new RuntimeException("invalid syntax");
 			}
 			StringBuilder sql = new StringBuilder();
-			sql.append("update ").append(table).append("\n").append(" set ")
+			sql.append("update ").append(holder.getTable()).append("\n").append(" set ")
 					.append(Joiner.on(",")
 							.join(values.values().stream().sorted(Comparator.comparing(Value::getVName))
 									.map(Value::getExpr).collect(Collectors.toList())))
 					.append("\n").append(SqlHelper.where(params));
-			return SqlParams.model(sql, Helper.valueMap(Helper.paramMap(params), values));
+			return SqlParams.model(holder.template, sql, Helper.valueMap(Helper.paramMap(params), values));
 		}
 
-		public static SqlParams select(Model model, String table, List<String> names, Map<String, List<Param>> params,
-				List<String> orderExprs, Integer offset, Integer limit) {
+		public static SqlParams select(Model model, ShardHolder holder, List<String> names,
+				Map<String, List<Param>> params, List<String> orderExprs, Integer offset, Integer limit) {
 			StringBuilder sql = new StringBuilder();
 			sql.append("select ");
 			if (CollectionUtils.isEmpty(names)) {
@@ -448,7 +446,7 @@ public abstract class Savor<T> {
 					return property.getColumn();
 				}).collect(Collectors.toList())));
 			}
-			sql.append(" from ").append(table).append(SqlHelper.where(params));
+			sql.append(" from ").append(holder.getTable()).append(SqlHelper.where(params));
 			if (!CollectionUtils.isEmpty(orderExprs)) {
 				sql.append(" order by ")
 						.append(Joiner.on(",").join(orderExprs.stream().map(String::trim).sorted().map(e -> {
@@ -464,7 +462,7 @@ public abstract class Savor<T> {
 			} else if (limit != null) {
 				sql.append(" limit ").append(limit);
 			}
-			return SqlParams.model(sql, Helper.paramMap(params));
+			return SqlParams.model(holder.template, sql, Helper.paramMap(params));
 		}
 
 		public static String where(Map<String, List<Param>> params) {
@@ -482,17 +480,20 @@ public abstract class Savor<T> {
 	 */
 	@Data
 	public static class SqlParams {
+		private final NamedParameterJdbcTemplate jdbcTemplate;
 		private final StringBuilder sql;
 		private final Map<String, Object> params;
 
-		public SqlParams(StringBuilder sql, Map<String, Object> params) {
+		public SqlParams(NamedParameterJdbcTemplate jdbcTemplate, StringBuilder sql, Map<String, Object> params) {
 			super();
+			this.jdbcTemplate = jdbcTemplate;
 			this.sql = sql;
 			this.params = params;
 		}
 
-		public static SqlParams model(StringBuilder sql, Map<String, Object> params) {
-			return new SqlParams(sql, params);
+		public static SqlParams model(NamedParameterJdbcTemplate jdbcTemplate, StringBuilder sql,
+				Map<String, Object> params) {
+			return new SqlParams(jdbcTemplate, sql, params);
 		}
 
 	}
@@ -507,24 +508,28 @@ public abstract class Savor<T> {
 		private final List<Property> properties;
 		private final Map<String, Property> propertyMap;
 		private final List<Property> insertProperties;
-		// private final List<Property> tableProperties;
-		private final Property tableKeyProperty;
+		private final Property shardProperty;
 		private final List<Property> updateTimeProperties;
 
 		public Model(Class<?> clazz) {
 			super();
-			Table tTable = clazz.getAnnotation(Table.class);
 			this.name = clazz.getSimpleName();
-			this.table = (tTable != null && !Strings.isNullOrEmpty(tTable.name())) ? tTable.name()
-					: CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, this.name);
 			this.properties = Collections.unmodifiableList(Arrays.stream(clazz.getDeclaredFields())
 					.filter(f -> !Modifier.isStatic(f.getModifiers()) && !Modifier.isFinal(f.getModifiers()))
 					.map(Property::new).collect(Collectors.toList()));
-			this.propertyMap = Collections
-					.unmodifiableMap(properties.stream().collect(Collectors.toMap(Property::getName, p -> p)));
-			this.tableKeyProperty = (tTable != null && !Strings.isNullOrEmpty(tTable.key()))
-					? this.getProperty(tTable.key())
-					: null;
+			this.propertyMap = Collections.unmodifiableMap(properties.stream()
+					.map(p -> Lists.newArrayList(Tuple.tuple(p.getName(), p), Tuple.tuple(p.getColumn(), p)))
+					.flatMap(List::stream).distinct().collect(Collectors.toMap(Tuple::getX, Tuple::getY)));
+			Shard shard = clazz.getAnnotation(Shard.class);
+			if (shard == null) {
+				this.table = CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, this.name);
+				this.shardProperty = null;
+			} else {
+				this.table = !Strings.isNullOrEmpty(shard.table()) ? shard.table()
+						: CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, this.name);
+				this.shardProperty = !Strings.isNullOrEmpty(shard.shardKey()) ? this.getProperty(shard.shardKey())
+						: null;
+			}
 			this.updateTimeProperties = Collections.unmodifiableList(
 					Arrays.stream(clazz.getDeclaredFields()).filter(f -> f.getAnnotation(TimeUpdate.class) != null)
 							.map(f -> this.getProperty(f.getName())).collect(Collectors.toList()));
@@ -589,10 +594,10 @@ public abstract class Savor<T> {
 	 */
 	@Target(ElementType.TYPE)
 	@Retention(RetentionPolicy.RUNTIME)
-	public @interface Table {
-		String name() default "";
+	public @interface Shard {
+		String table() default "";
 
-		String key() default "";
+		String shardKey() default "";
 	}
 
 	/**
@@ -638,6 +643,30 @@ public abstract class Savor<T> {
 			super();
 			this.x = x;
 			this.y = v;
+		}
+
+		@Override
+		public boolean equals(Object other) {
+			if (other == null || other.getClass() != Tuple.class) {
+				return false;
+			}
+			Tuple<?, ?> oTuple = (Tuple<?, ?>) other;
+			if (this.x != null && !this.x.equals(oTuple.x)) {
+				return false;
+			} else if (this.x == null && oTuple.x != null) {
+				return false;
+			} else if (this.y != null && !this.y.equals(oTuple.y)) {
+				return false;
+			} else if (this.y == null && oTuple.y != null) {
+				return false;
+			} else {
+				return true;
+			}
+		}
+
+		@Override
+		public int hashCode() {
+			return (this.x == null ? 0 : this.x.hashCode()) / 2 + (this.y == null ? 0 : this.y.hashCode()) / 2;
 		}
 	}
 
@@ -751,6 +780,36 @@ public abstract class Savor<T> {
 				return symbol;
 			}
 		}
+	}
+
+	/**
+	 * @author kuojian21
+	 */
+	@Data
+	public static class ShardHolder {
+		private final NamedParameterJdbcTemplate template;
+		private final String table;
+
+		public ShardHolder(NamedParameterJdbcTemplate template, String table) {
+			super();
+			this.template = template;
+			this.table = table;
+		}
+
+		@Override
+		public boolean equals(Object other) {
+			if (other != null && other instanceof ShardHolder) {
+				ShardHolder o = (ShardHolder) other;
+				return this.table.equals(o.table) && this.template.equals(o.template);
+			}
+			return false;
+		}
+
+		@Override
+		public int hashCode() {
+			return this.table.hashCode() / 2 + this.template.hashCode() / 2;
+		}
+
 	}
 
 }

@@ -33,6 +33,7 @@ public class TeSavor {
 
 		Object obj = new Object[] { 1, 2, 3, 4 };
 		System.out.println(Arrays.asList((Object[]) obj));
+		System.out.println(null == null);
 	}
 
 	public static void cartesian(String[] args) {
