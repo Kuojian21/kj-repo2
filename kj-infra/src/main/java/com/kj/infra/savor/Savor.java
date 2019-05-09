@@ -37,6 +37,7 @@ import com.google.common.collect.Maps;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 
 /**
  * @author kuojian21
@@ -49,16 +50,12 @@ public abstract class Savor<T> {
 	private final Class<T> clazz;
 	private final RowMapper<T> rowMapper;
 	private final Model model;
-	private final ShardHolder defReaderShard;
-	private final ShardHolder defWriterShard;
 
 	@SuppressWarnings("unchecked")
 	protected Savor() {
 		clazz = (Class<T>) (((ParameterizedType) this.getClass().getGenericSuperclass()).getActualTypeArguments()[0]);
 		rowMapper = new BeanPropertyRowMapper<>(clazz);
 		model = ModelHelper.model(clazz);
-		defReaderShard = new ShardHolder(this.getReader(), this.model.table);
-		defWriterShard = new ShardHolder(this.getWriter(), this.model.table);
 	}
 
 	public int update(SqlParams sqlParams) {
@@ -163,7 +160,8 @@ public abstract class Savor<T> {
 		Map<String, List<Param>> params = Helper.initParams(this.model, paramMap);
 		Property property = this.model.getShardProperty();
 		if (property == null) {
-			return Helper.newHashMap(update ? this.defWriterShard : this.defReaderShard, params);
+			return Helper.newHashMap(new ShardHolder(update ? this.getWriter() : this.getReader(), model.table),
+					params);
 		}
 		List<Param> paramList = params.get(property.getName());
 		if (paramList == null) {
@@ -199,7 +197,7 @@ public abstract class Savor<T> {
 	protected Map<ShardHolder, List<T>> shard(List<T> objs) {
 		Property property = this.model.getShardProperty();
 		if (property == null) {
-			return Helper.newHashMap(this.defWriterShard, objs);
+			return Helper.newHashMap(new ShardHolder(this.getWriter(), model.table), objs);
 		} else {
 			return objs.stream()
 					.collect(Collectors.groupingBy(o -> this.shard().apply(property.getOrInsertDef(o), true)));
@@ -360,11 +358,11 @@ public abstract class Savor<T> {
 					}
 				}
 				if (op == Param.OP.IN && value.getClass().isArray()) {
-					result.getOrDefault(p.getName(), Lists.newArrayList())
+					result.computeIfAbsent(p.getName(), k -> Lists.newArrayList())
 							.add(new Param(p, Param.OP.IN, Arrays.asList((Object[]) value)));
 					return;
 				}
-				result.getOrDefault(p.getName(), Lists.newArrayList()).add(new Param(p, op, value));
+				result.computeIfAbsent(p.getName(), k -> Lists.newArrayList()).add(new Param(p, op, value));
 			});
 			return result;
 		}
@@ -808,6 +806,153 @@ public abstract class Savor<T> {
 		@Override
 		public int hashCode() {
 			return this.table.hashCode() / 2 + this.template.hashCode() / 2;
+		}
+
+	}
+
+	/**
+	 * @author kuojian21
+	 */
+	@Data
+	public static class Select {
+		private boolean all;
+		private StringBuilder sql = new StringBuilder();
+		private Map<String, List<Param>> params;
+		private Map<String, List<Param>> others;
+	}
+
+	/**
+	 * @author kuojian21
+	 */
+	@Getter
+	public static class SelectBuilder {
+
+		private Collection<String> columns;
+		private ParamsBuilder paramsBuilder;
+		private Collection<String> orderExprs;
+		private Integer offset;
+		private Integer limit;
+
+		public static SelectBuilder newBuilder() {
+			return new SelectBuilder();
+		}
+
+		public SelectBuilder columns(Collection<String> columns) {
+			this.columns = columns;
+			return this;
+		}
+
+		public SelectBuilder where(ParamsBuilder paramsBuilder) {
+			this.paramsBuilder = paramsBuilder;
+			return this;
+		}
+
+		public SelectBuilder order(Collection<String> orderExprs) {
+			this.orderExprs = orderExprs;
+			return this;
+		}
+
+		public SelectBuilder limit(int limit) {
+			this.limit = limit;
+			return this;
+		}
+
+		public SelectBuilder limit(int offset, int limit) {
+			this.offset = offset;
+			this.limit = limit;
+			return this;
+		}
+
+		public Select build(Model model) {
+			return null;
+		}
+
+	}
+
+	public static class GroupBuilder {
+
+	}
+
+	public static class ColumnsBuilder {
+
+	}
+
+	public static class OrderBuilder {
+
+	}
+
+	/**
+	 * @author kuojian21
+	 */
+	@Data
+	public static class Params {
+		private final ParamsBuilder.CONN conn;
+		private final StringBuilder sql = new StringBuilder();
+		private final Map<String, List<Param>> master;
+		private final Map<String, List<Param>> others = Maps.newConcurrentMap();
+
+		public Params(ParamsBuilder.CONN conn, Map<String, List<Param>> master) {
+			super();
+			this.conn = conn;
+			this.master = master;
+		}
+
+	}
+
+	/**
+	 * @author kuojian21
+	 */
+	public static class ParamsBuilder {
+		private final CONN conn;
+		private final Map<String, Object> master = Maps.newHashMap();
+		private final List<ParamsBuilder> others = Lists.newArrayList();
+
+		/**
+		 * @author kuojian21
+		 */
+		public enum CONN {
+			AND, OR
+		}
+
+		private ParamsBuilder(CONN conn) {
+			super();
+			this.conn = conn;
+		}
+
+		public static ParamsBuilder ofAnd() {
+			return of(CONN.AND);
+		}
+
+		public static ParamsBuilder ofOr() {
+			return of(CONN.OR);
+		}
+
+		public static ParamsBuilder of(CONN conn) {
+			return new ParamsBuilder(conn);
+		}
+
+		public ParamsBuilder with(String name, Object value) {
+			this.master.put(name, value);
+			return this;
+		}
+
+		public ParamsBuilder with(ParamsBuilder pBuilder) {
+			this.others.add(pBuilder);
+			return this;
+		}
+
+		public Params build(Model model) {
+			Params params = new Params(this.conn, Helper.initParams(model, this.master));
+			List<String> exprs = params.getMaster().entrySet().stream().flatMap(e -> e.getValue().stream())
+					.sorted(Comparator.comparing(Param::getVName)).map(Param::getExpr).collect(Collectors.toList());
+			this.others.forEach(p -> {
+				Params tp = p.build(model);
+				exprs.add("(" + tp.getSql().toString() + ")");
+				params.others.putAll(tp.getMaster());
+				params.others.putAll(tp.getOthers());
+			});
+			params.sql.append(Joiner.on(" " + this.conn.name() + " ").join(exprs));
+			return params;
 		}
 
 	}

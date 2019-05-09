@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 
 import javax.sql.DataSource;
 
@@ -29,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 public class TeSavor {
 
 	public static void main(String[] args) throws SQLException {
-		cartesian(args);
+		test(args);
 
 		Object obj = new Object[] { 1, 2, 3, 4 };
 		System.out.println(Arrays.asList((Object[]) obj));
@@ -90,21 +91,21 @@ public class TeSavor {
 	public static void test(String[] args) throws SQLException {
 		SavorBaseTestDao dao = new SavorBaseTestDao(
 				new SimpleDriverDataSource(new Driver(), args[0], args[1], args[2]));
-//		/**
-//		 * test insert def
-//		 */
-//		LongStream.range(0, 10).boxed().forEach(i -> {
-//			log.info("{}", dao.insert(LongStream.range(0, 10).boxed().map(j -> {
-//				SavorBaseTest test = new SavorBaseTest();
-//				test.setId(i * 10 + j + 1);
-//				return test;
-//			}).collect(Collectors.toList())));
-//		});
+		/**
+		 * test insert def
+		 */
+		LongStream.range(0, 10).boxed().forEach(i -> {
+			log.info("{}", dao.insert(LongStream.range(0, 10).boxed().map(j -> {
+				SavorBaseTest test = new SavorBaseTest();
+				test.setId(i * 10 + j + 1);
+				return test;
+			}).collect(Collectors.toList())));
+		});
 
-//		/**
-//		 * test delete
-//		 */
-		dao.delete(Savor.Helper.newHashMap("id", 1));
+		/**
+		 * test delete
+		 */
+//		dao.delete(Savor.Helper.newHashMap("id", 1));
 		IntStream.range(0, 10).boxed().forEach(i -> dao.update(Savor.Helper.newHashMap("name", "kj"),
 				Savor.Helper.newHashMap("id", new Random().nextInt(100))));
 		log.info("{}", dao.select(Savor.Helper.newHashMap("name", "kj")));
