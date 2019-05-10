@@ -37,7 +37,6 @@ import com.google.common.collect.Maps;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
 
 /**
  * @author kuojian21
@@ -100,39 +99,59 @@ public abstract class Savor<T> {
 		if (objs == null || objs.isEmpty()) {
 			return 0;
 		}
-		return this.update(this.shard(objs).entrySet().stream().map(e -> SqlHelper.upsert(this.model, e.getKey(),
-				e.getValue(), Helper.initValues(this.model, values, true))));
+		return this.upsert(objs, ValuesBuilder.of(true).with(values));
+	}
+
+	public int upsert(List<T> objs, ValuesBuilder valuesBuilder) {
+		if (objs == null || objs.isEmpty()) {
+			return 0;
+		}
+		return this.update(this.shard(objs).entrySet().stream()
+				.map(e -> SqlHelper.upsert(this.model, e.getKey(), e.getValue(), valuesBuilder.build(this.model))));
 	}
 
 	public int delete(Map<String, Object> params) {
-		return this.update(this.shard(params, true).entrySet().stream()
-				.map(e -> SqlHelper.delete(this.model, e.getKey(), e.getValue())));
+		return this.delete(ParamsBuilder.ofAnd().with(params));
+	}
+
+	public int delete(ParamsBuilder paramsBuilder) {
+		return this.update(this.shard(paramsBuilder, true).entrySet().stream()
+				.map(e -> SqlHelper.delete(e.getKey(), e.getValue())));
 	}
 
 	public int update(Map<String, Object> values, Map<String, Object> params) {
-		return this.update(this.shard(params, true).entrySet().stream()
-				.map(e -> SqlHelper.update(model, e.getKey(), Helper.initValues(model, values, false), e.getValue())));
+		return this.update(ValuesBuilder.of(false).with(values), ParamsBuilder.ofAnd().with(params));
+	}
+
+	public int update(ValuesBuilder valuesBuilder, ParamsBuilder paramsBuilder) {
+		return this.update(this.shard(paramsBuilder, true).entrySet().stream()
+				.map(e -> SqlHelper.update(e.getKey(), valuesBuilder.build(this.model), e.getValue())));
 	}
 
 	public List<T> select(Map<String, Object> params) {
 		return this.select(params, null, null, null);
 	}
 
-	public List<T> select(Map<String, Object> params, List<String> orderExprs, Integer offset, Integer limit) {
-		return this.select(null, params, orderExprs, offset, limit, this.getRowMapper());
+	public List<T> select(Map<String, Object> params, List<String> orders, Integer offset, Integer limit) {
+		return this.select(null, params, orders, offset, limit, this.getRowMapper());
 	}
 
 	@SuppressWarnings("checkstyle:HiddenField")
-	public <R> List<R> select(List<String> names, Map<String, Object> params, RowMapper<R> rowMapper) {
-		return this.select(names, params, null, null, null, rowMapper);
+	public <R> List<R> select(List<String> columns, Map<String, Object> params, RowMapper<R> rowMapper) {
+		return this.select(columns, params, null, null, null, rowMapper);
 	}
 
 	@SuppressWarnings("checkstyle:HiddenField")
-	public <R> List<R> select(List<String> names, Map<String, Object> params, List<String> orderExprs, Integer offset,
+	public <R> List<R> select(List<String> columns, Map<String, Object> params, List<String> orders, Integer offset,
 			Integer limit, RowMapper<R> rowMapper) {
-		return this.select(
-				this.shard(params, false).entrySet().stream().map(
-						e -> SqlHelper.select(this.model, e.getKey(), names, e.getValue(), orderExprs, offset, limit)),
+		return this.select(columns, ParamsBuilder.ofAnd().with(params), null, orders, offset, limit, rowMapper);
+	}
+
+	@SuppressWarnings("checkstyle:HiddenField")
+	public <R> List<R> select(List<String> columns, ParamsBuilder paramsBuilder, List<String> groups,
+			List<String> orders, Integer offset, Integer limit, RowMapper<R> rowMapper) {
+		return this.select(this.shard(paramsBuilder, false).entrySet().stream().map(
+				e -> SqlHelper.select(this.model, e.getKey(), columns, e.getValue(), groups, orders, offset, limit)),
 				rowMapper);
 	}
 
@@ -156,15 +175,16 @@ public abstract class Savor<T> {
 		throw new RuntimeException("not supported");
 	}
 
-	protected Map<ShardHolder, Map<String, List<Param>>> shard(Map<String, Object> paramMap, boolean update) {
-		Map<String, List<Param>> params = Helper.initParams(this.model, paramMap);
+	protected Map<ShardHolder, ParamsBuilder.Params> shard(ParamsBuilder paramsBuilder, boolean update) {
+		ParamsBuilder.Params params = paramsBuilder.build(this.model);
+		Map<String, List<Param>> tParams = params.master;
 		Property property = this.model.getShardProperty();
 		if (property == null) {
 			return Helper.newHashMap(new ShardHolder(update ? this.getWriter() : this.getReader(), model.table),
 					params);
 		}
-		List<Param> paramList = params.get(property.getName());
-		if (paramList == null) {
+		List<Param> paramList = tParams.get(property.getName());
+		if (paramList == null || params.getConn() == ParamsBuilder.CONN.OR) {
 			ShardHolder holder = this.shard().apply(null, update);
 			if (holder != null) {
 				return Helper.newHashMap(holder, params);
@@ -179,12 +199,10 @@ public abstract class Savor<T> {
 				return ((Collection<?>) param.getValue()).stream()
 						.map(e -> Tuple.tuple(this.shard().apply(e, update), e))
 						.collect(Collectors.groupingBy(Tuple::getX)).entrySet().stream()
-						.collect(Collectors.toMap(Map.Entry::getKey, e -> {
-							Map<String, List<Param>> result = Maps.newHashMap(params);
-							result.put(property.getName(), Lists.newArrayList(new Param(property, Param.OP.IN,
-									e.getValue().stream().map(Tuple::getY).collect(Collectors.toList()))));
-							return result;
-						}));
+						.collect(Collectors.toMap(Map.Entry::getKey,
+								e -> params.copy().addMaster(property.getName(), Lists.newArrayList(new Param(property,
+										Param.OP.IN,
+										e.getValue().stream().map(Tuple::getY).collect(Collectors.toList()))))));
 			default:
 				return this.shards(update).stream().collect(Collectors.toMap(t -> t, t -> params));
 			}
@@ -264,107 +282,16 @@ public abstract class Savor<T> {
 			return result;
 		}
 
-		public static Map<String, Object> paramMap(Map<String, List<Param>> params) {
+		public static Map<String, Object> paramMap(ParamsBuilder.Params params) {
 			Map<String, Object> paramMap = Maps.newHashMap();
-			params.forEach((key, value) -> value.forEach(v -> paramMap.put(v.getVName(), v.getValue())));
+			params.master.forEach((key, value) -> value.forEach(v -> paramMap.put(v.getVName(), v.getValue())));
+			params.others.forEach((key, value) -> value.forEach(v -> paramMap.put(v.getVName(), v.getValue())));
 			return paramMap;
 		}
 
-		public static Map<String, Object> valueMap(Map<String, Object> paramMap, Map<String, Value> values) {
-			values.values().forEach(v -> paramMap.put(v.getVName(), v.getValue()));
+		public static Map<String, Object> valueMap(Map<String, Object> paramMap, ValuesBuilder.Values values) {
+			values.values.values().forEach(v -> paramMap.put(v.getVName(), v.getValue()));
 			return paramMap;
-		}
-
-		public static Map<String, Value> initValues(Model model, Map<String, Object> values, boolean upsert) {
-			Map<String, Value> result = Maps.newHashMap();
-			if (CollectionUtils.isEmpty(values)) {
-				model.getUpdateTimeProperties().forEach(p -> result.putIfAbsent(p.getName(),
-						new Value(p, Value.OP.EQ, upsert, p.getUpdateDef().get())));
-				return result;
-			}
-			values.forEach((key, value) -> {
-				String[] s = key.split("#");
-				s[0] = s[0].trim();
-				Property p = model.getProperty(s[0]);
-				Value.OP op = Value.OP.EQ;
-				if (s.length == 2) {
-					switch (s[1].trim().toUpperCase()) {
-					case "EXPR":
-						op = Value.OP.EXPR;
-						break;
-					case "ADD":
-						op = Value.OP.ADD;
-						break;
-					case "SUB":
-						op = Value.OP.SUB;
-						break;
-					default:
-						break;
-					}
-				}
-				result.putIfAbsent(p.getName(), new Value(p, op, upsert, value));
-			});
-			model.getUpdateTimeProperties().forEach(
-					p -> result.putIfAbsent(p.getName(), new Value(p, Value.OP.EQ, upsert, p.getUpdateDef().get())));
-			return result;
-		}
-
-		public static Map<String, List<Param>> initParams(Model model, Map<String, Object> params) {
-			Map<String, List<Param>> result = Maps.newHashMap();
-			if (CollectionUtils.isEmpty(params)) {
-				return result;
-			}
-			params.forEach((key, value) -> {
-				String[] s = key.split("#");
-				s[0] = s[0].trim();
-				Property p = model.getProperty(s[0]);
-				Param.OP op = Param.OP.EQ;
-				if (s.length == 2) {
-					switch (s[1].trim().toUpperCase()) {
-					case "<=":
-					case "LE":
-						op = Param.OP.LE;
-						break;
-					case "<":
-					case "LT":
-						op = Param.OP.LT;
-						break;
-					case ">=":
-					case "GE":
-						op = Param.OP.GE;
-						break;
-					case ">":
-					case "GT":
-						op = Param.OP.GT;
-						break;
-					case "!=":
-					case "!":
-					case "<>":
-					case "NE":
-						op = Param.OP.NE;
-						break;
-					case "IN":
-					case "=":
-					case "EQ":
-						if (value != null && (value instanceof Collection || value.getClass().isArray())) {
-							op = Param.OP.IN;
-						} else {
-							op = Param.OP.EQ;
-						}
-						break;
-					default:
-						logger.error("invalid syntax:{}", key);
-						throw new RuntimeException("invalid syntax:" + key);
-					}
-				}
-				if (op == Param.OP.IN && value.getClass().isArray()) {
-					result.computeIfAbsent(p.getName(), k -> Lists.newArrayList())
-							.add(new Param(p, Param.OP.IN, Arrays.asList((Object[]) value)));
-					return;
-				}
-				result.computeIfAbsent(p.getName(), k -> Lists.newArrayList()).add(new Param(p, op, value));
-			});
-			return result;
 		}
 	}
 
@@ -396,63 +323,74 @@ public abstract class Savor<T> {
 			return SqlParams.model(holder.template, sql, params);
 		}
 
-		public static <T> SqlParams upsert(Model model, ShardHolder holder, List<T> objs, Map<String, Value> values) {
-			if (CollectionUtils.isEmpty(values)) {
+		public static <T> SqlParams upsert(Model model, ShardHolder holder, List<T> objs, ValuesBuilder.Values values) {
+			if (CollectionUtils.isEmpty(values.values)) {
 				return SqlHelper.insert(model, holder, objs, true);
 			}
 			SqlParams sqlParams = SqlHelper.insert(model, holder, objs, false);
-			sqlParams.getSql().append(" on duplicate key update ").append(
-					Joiner.on(",").join(values.entrySet().stream().sorted(Comparator.comparing(Map.Entry::getKey))
-							.map(e -> e.getValue().getExpr()).collect(Collectors.toList())));
+			sqlParams.getSql().append(" on duplicate key update ")
+					.append(Joiner.on(",")
+							.join(values.values.entrySet().stream().sorted(Comparator.comparing(Map.Entry::getKey))
+									.map(e -> e.getValue().getExpr()).collect(Collectors.toList())));
 			Helper.valueMap(sqlParams.getParams(), values);
 			return sqlParams;
 		}
 
-		public static SqlParams delete(Model model, ShardHolder holder, Map<String, List<Param>> params) {
+		public static SqlParams delete(ShardHolder holder, ParamsBuilder.Params params) {
 			StringBuilder sql = new StringBuilder();
-			sql.append("delete from ").append(holder.getTable()).append("\n").append(SqlHelper.where(params));
+			sql.append("delete from ").append(holder.getTable()).append("\n").append(params.getWhere());
 			return SqlParams.model(holder.template, sql, Helper.paramMap(params));
 		}
 
-		public static SqlParams update(Model model, ShardHolder holder, Map<String, Value> values,
-				Map<String, List<Param>> params) {
-			if (CollectionUtils.isEmpty(values)) {
+		public static SqlParams update(ShardHolder holder, ValuesBuilder.Values values, ParamsBuilder.Params params) {
+			if (CollectionUtils.isEmpty(values.values)) {
 				logger.error("invalid syntax");
 				throw new RuntimeException("invalid syntax");
 			}
 			StringBuilder sql = new StringBuilder();
 			sql.append("update ").append(holder.getTable()).append("\n").append(" set ")
 					.append(Joiner.on(",")
-							.join(values.values().stream().sorted(Comparator.comparing(Value::getVName))
+							.join(values.values.values().stream().sorted(Comparator.comparing(Value::getVName))
 									.map(Value::getExpr).collect(Collectors.toList())))
-					.append("\n").append(SqlHelper.where(params));
+					.append("\n").append(params.getWhere());
 			return SqlParams.model(holder.template, sql, Helper.valueMap(Helper.paramMap(params), values));
 		}
 
-		public static SqlParams select(Model model, ShardHolder holder, List<String> names,
-				Map<String, List<Param>> params, List<String> orderExprs, Integer offset, Integer limit) {
+		public static SqlParams select(Model model, ShardHolder holder, List<String> columns,
+				ParamsBuilder.Params params, List<String> groups, List<String> orders, Integer offset, Integer limit) {
 			StringBuilder sql = new StringBuilder();
 			sql.append("select ");
-			if (CollectionUtils.isEmpty(names)) {
+			if (CollectionUtils.isEmpty(columns)) {
 				sql.append("*");
 			} else {
-				sql.append(Joiner.on(",").join(Lists.newArrayList(names).stream().map(String::trim).sorted().map(n -> {
-					Property property = model.getProperty(n);
-					if (property == null) {
-						return n;
-					}
-					return property.getColumn();
-				}).collect(Collectors.toList())));
-			}
-			sql.append(" from ").append(holder.getTable()).append(SqlHelper.where(params));
-			if (!CollectionUtils.isEmpty(orderExprs)) {
-				sql.append(" order by ")
-						.append(Joiner.on(",").join(orderExprs.stream().map(String::trim).sorted().map(e -> {
-							Property p = model.getProperty(e);
-							if (p == null) {
-								return e;
+				sql.append(
+						Joiner.on(",").join(Lists.newArrayList(columns).stream().map(String::trim).sorted().map(n -> {
+							Property property = model.getProperty(n);
+							if (property == null) {
+								return n;
 							}
-							return p.getColumn();
+							return property.getColumn();
+						}).collect(Collectors.toList())));
+			}
+			sql.append(" from ").append(holder.getTable()).append(params.getWhere());
+			if (!CollectionUtils.isEmpty(groups)) {
+				sql.append(" group by ").append(Joiner.on(",").join(groups.stream().map(String::trim).sorted()
+						.map(g -> model.getProperty(g).getColumn()).collect(Collectors.toList())));
+			}
+			if (!CollectionUtils.isEmpty(orders)) {
+				sql.append(" order by ")
+						.append(Joiner.on(",").join(orders.stream().map(String::trim).sorted().map(o -> {
+							String[] s = o.split("#");
+							s[0] = s[0].trim();
+							Property p = model.getProperty(s[0]);
+							String t = " ASC ";
+							if (s.length == 2 && s[1].toUpperCase().startsWith("D")) {
+								t = " DESC ";
+							}
+							if (p == null) {
+								return o + t;
+							}
+							return p.getColumn() + t;
 						}).collect(Collectors.toList())));
 			}
 			if (offset != null) {
@@ -461,14 +399,6 @@ public abstract class Savor<T> {
 				sql.append(" limit ").append(limit);
 			}
 			return SqlParams.model(holder.template, sql, Helper.paramMap(params));
-		}
-
-		public static String where(Map<String, List<Param>> params) {
-			if (params == null || params.isEmpty()) {
-				return "";
-			}
-			return " where " + Joiner.on(" \nand ").join(params.entrySet().stream().flatMap(e -> e.getValue().stream())
-					.sorted(Comparator.comparing(Param::getVName)).map(Param::getExpr).collect(Collectors.toList()));
 		}
 
 	}
@@ -718,6 +648,9 @@ public abstract class Savor<T> {
 			}
 		}
 
+		/**
+		 * @author kuojian21
+		 */
 		public enum OP {
 			EQ("="), IN("in"), LT("<"), LE("<="), GT(">"), GE(">="), NE("!=");
 			private final String symbol;
@@ -766,6 +699,9 @@ public abstract class Savor<T> {
 			}
 		}
 
+		/**
+		 * @author kuojian21
+		 */
 		public enum OP {
 			EQ("="), ADD("+"), SUB("-"), EXPR("EXPR");
 			private final String symbol;
@@ -796,7 +732,7 @@ public abstract class Savor<T> {
 
 		@Override
 		public boolean equals(Object other) {
-			if (other != null && other instanceof ShardHolder) {
+			if (other instanceof ShardHolder) {
 				ShardHolder o = (ShardHolder) other;
 				return this.table.equals(o.table) && this.template.equals(o.template);
 			}
@@ -813,96 +749,45 @@ public abstract class Savor<T> {
 	/**
 	 * @author kuojian21
 	 */
-	@Data
-	public static class Select {
-		private boolean all;
-		private StringBuilder sql = new StringBuilder();
-		private Map<String, List<Param>> params;
-		private Map<String, List<Param>> others;
-	}
-
-	/**
-	 * @author kuojian21
-	 */
-	@Getter
-	public static class SelectBuilder {
-
-		private Collection<String> columns;
-		private ParamsBuilder paramsBuilder;
-		private Collection<String> orderExprs;
-		private Integer offset;
-		private Integer limit;
-
-		public static SelectBuilder newBuilder() {
-			return new SelectBuilder();
-		}
-
-		public SelectBuilder columns(Collection<String> columns) {
-			this.columns = columns;
-			return this;
-		}
-
-		public SelectBuilder where(ParamsBuilder paramsBuilder) {
-			this.paramsBuilder = paramsBuilder;
-			return this;
-		}
-
-		public SelectBuilder order(Collection<String> orderExprs) {
-			this.orderExprs = orderExprs;
-			return this;
-		}
-
-		public SelectBuilder limit(int limit) {
-			this.limit = limit;
-			return this;
-		}
-
-		public SelectBuilder limit(int offset, int limit) {
-			this.offset = offset;
-			this.limit = limit;
-			return this;
-		}
-
-		public Select build(Model model) {
-			return null;
-		}
-
-	}
-
-	public static class GroupBuilder {
-
-	}
-
-	public static class ColumnsBuilder {
-
-	}
-
-	public static class OrderBuilder {
-
-	}
-
-	/**
-	 * @author kuojian21
-	 */
-	@Data
-	public static class Params {
-		private final ParamsBuilder.CONN conn;
-		private final StringBuilder sql = new StringBuilder();
-		private final Map<String, List<Param>> master;
-		private final Map<String, List<Param>> others = Maps.newConcurrentMap();
-
-		public Params(ParamsBuilder.CONN conn, Map<String, List<Param>> master) {
-			super();
-			this.conn = conn;
-			this.master = master;
-		}
-
-	}
-
-	/**
-	 * @author kuojian21
-	 */
 	public static class ParamsBuilder {
+
+		/**
+		 * @author kuojian21
+		 */
+		@Data
+		public static class Params {
+			private final ParamsBuilder.CONN conn;
+			private final StringBuilder where;
+			private final Map<String, List<Param>> master;
+			private final Map<String, List<Param>> others;
+
+			public Params(ParamsBuilder.CONN conn, Map<String, List<Param>> master) {
+				super();
+				this.conn = conn;
+				this.master = master;
+				this.where = new StringBuilder();
+				this.others = Maps.newHashMap();
+			}
+
+			public Params(CONN conn, StringBuilder where, Map<String, List<Param>> master,
+					Map<String, List<Param>> others) {
+				this.conn = conn;
+				this.where = where;
+				this.master = master;
+				this.others = others;
+			}
+
+			public Params copy() {
+				return new Params(this.conn, this.where, Maps.newHashMap(this.master), this.others);
+			}
+
+			public Params addMaster(String name, List<Param> paramList) {
+				this.master.put(name, paramList);
+				return this;
+			}
+
+		}
+
 		private final CONN conn;
 		private final Map<String, Object> master = Maps.newHashMap();
 		private final List<ParamsBuilder> others = Lists.newArrayList();
@@ -931,6 +816,11 @@ public abstract class Savor<T> {
 			return new ParamsBuilder(conn);
 		}
 
+		public ParamsBuilder with(Map<String, Object> params) {
+			this.master.putAll(params);
+			return this;
+		}
+
 		public ParamsBuilder with(String name, Object value) {
 			this.master.put(name, value);
 			return this;
@@ -942,17 +832,141 @@ public abstract class Savor<T> {
 		}
 
 		public Params build(Model model) {
-			Params params = new Params(this.conn, Helper.initParams(model, this.master));
-			List<String> exprs = params.getMaster().entrySet().stream().flatMap(e -> e.getValue().stream())
+			Map<String, List<Param>> result = Maps.newHashMap();
+			if (!CollectionUtils.isEmpty(this.master)) {
+				this.master.forEach((key, value) -> {
+					String[] s = key.split("#");
+					s[0] = s[0].trim();
+					Property p = model.getProperty(s[0]);
+					Param.OP op = Param.OP.EQ;
+					if (s.length == 2) {
+						switch (s[1].trim().toUpperCase()) {
+						case "<=":
+						case "LE":
+							op = Param.OP.LE;
+							break;
+						case "<":
+						case "LT":
+							op = Param.OP.LT;
+							break;
+						case ">=":
+						case "GE":
+							op = Param.OP.GE;
+							break;
+						case ">":
+						case "GT":
+							op = Param.OP.GT;
+							break;
+						case "!=":
+						case "!":
+						case "<>":
+						case "NE":
+							op = Param.OP.NE;
+							break;
+						case "IN":
+						case "=":
+						case "EQ":
+							if (value != null && (value instanceof Collection || value.getClass().isArray())) {
+								op = Param.OP.IN;
+							} else {
+								op = Param.OP.EQ;
+							}
+							break;
+						default:
+							logger.error("invalid syntax:{}", key);
+							throw new RuntimeException("invalid syntax:" + key);
+						}
+					}
+					if (op == Param.OP.IN && value.getClass().isArray()) {
+						result.computeIfAbsent(p.getName(), k -> Lists.newArrayList())
+								.add(new Param(p, Param.OP.IN, Arrays.asList((Object[]) value)));
+					} else {
+						result.computeIfAbsent(p.getName(), k -> Lists.newArrayList()).add(new Param(p, op, value));
+					}
+				});
+			}
+			Params tParams = new Params(this.conn, result);
+			List<String> exprs = tParams.getMaster().entrySet().stream().flatMap(e -> e.getValue().stream())
 					.sorted(Comparator.comparing(Param::getVName)).map(Param::getExpr).collect(Collectors.toList());
-			this.others.forEach(p -> {
-				Params tp = p.build(model);
-				exprs.add("(" + tp.getSql().toString() + ")");
-				params.others.putAll(tp.getMaster());
-				params.others.putAll(tp.getOthers());
-			});
-			params.sql.append(Joiner.on(" " + this.conn.name() + " ").join(exprs));
-			return params;
+			this.others.stream().map(pb -> pb.build(model)).sorted(Comparator.comparing(p -> p.getWhere().toString()))
+					.forEach(p -> {
+						exprs.add("(" + p.getWhere() + ")");
+						tParams.others.putAll(p.getMaster());
+						tParams.others.putAll(p.getOthers());
+					});
+			if (!exprs.isEmpty()) {
+				tParams.where.append(" where ").append(Joiner.on(" " + this.conn.name() + " ").join(exprs));
+			}
+			return tParams;
+		}
+	}
+
+	/**
+	 * @author kuojian21
+	 */
+	public static class ValuesBuilder {
+		private final boolean upsert;
+		private final Map<String, Object> values = Maps.newHashMap();
+
+		/**
+		 * @author kuojian21
+		 */
+		@Data
+		public static class Values {
+			private final Map<String, Value> values;
+
+			public Values(Map<String, Value> values) {
+				this.values = values;
+			}
+		}
+
+		public ValuesBuilder(boolean upsert) {
+			this.upsert = upsert;
+		}
+
+		public static ValuesBuilder of(boolean upsert) {
+			return new ValuesBuilder(upsert);
+		}
+
+		public ValuesBuilder with(Map<String, Object> values) {
+			this.values.putAll(values);
+			return this;
+		}
+
+		public ValuesBuilder with(String name, Object value) {
+			this.values.put(name, value);
+			return this;
+		}
+
+		public Values build(Model model) {
+			Map<String, Value> result = Maps.newHashMap();
+			if (!CollectionUtils.isEmpty(values)) {
+				values.forEach((key, value) -> {
+					String[] s = key.split("#");
+					s[0] = s[0].trim();
+					Property p = model.getProperty(s[0]);
+					Value.OP op = Value.OP.EQ;
+					if (s.length == 2) {
+						switch (s[1].trim().toUpperCase()) {
+						case "EXPR":
+							op = Value.OP.EXPR;
+							break;
+						case "ADD":
+							op = Value.OP.ADD;
+							break;
+						case "SUB":
+							op = Value.OP.SUB;
+							break;
+						default:
+							break;
+						}
+					}
+					result.putIfAbsent(p.getName(), new Value(p, op, upsert, value));
+				});
+			}
+			model.getUpdateTimeProperties().forEach(
+					p -> result.putIfAbsent(p.getName(), new Value(p, Value.OP.EQ, upsert, p.getUpdateDef().get())));
+			return new Values(result);
 		}
 
 	}
