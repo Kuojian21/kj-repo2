@@ -75,17 +75,17 @@ public class TeSavor {
 	}
 
 	public static void sql() throws Exception {
-		System.out.println(Savor.SqlHelper.insert(Savor.ModelHelper.model(SavorBaseTest.class), null,
-				Lists.newArrayList(new SavorBaseTest(), new SavorBaseTest()), false));
-		System.out.println(Savor.SqlHelper.upsert(Savor.ModelHelper.model(SavorBaseTest.class), null,
-				Lists.newArrayList(new SavorBaseTest(), new SavorBaseTest()),
-				Savor.Helper.newHashMap("name", "values(name)")));
-		System.out.println(Savor.SqlHelper.delete(Savor.ModelHelper.model(SavorBaseTest.class), null,
-				Savor.Helper.newHashMap("id", 100)));
-		System.out.println(Savor.SqlHelper.update(Savor.ModelHelper.model(SavorBaseTest.class), null,
-				Savor.Helper.newHashMap("name", "kj"), Savor.Helper.newHashMap("id", 100)));
-		System.out.println(Savor.SqlHelper.select(Savor.ModelHelper.model(SavorBaseTest.class), null, null,
-				Savor.Helper.newHashMap("id#lt", 100), null, null, null));
+//		System.out.println(Savor.SqlHelper.insert(Savor.ModelHelper.model(SavorBaseTest.class), null,
+//				Lists.newArrayList(new SavorBaseTest(), new SavorBaseTest()), false));
+//		System.out.println(Savor.SqlHelper.upsert(Savor.ModelHelper.model(SavorBaseTest.class), null,
+//				Lists.newArrayList(new SavorBaseTest(), new SavorBaseTest()),
+//				Savor.Helper.newHashMap("name", "values(name)")));
+//		System.out.println(Savor.SqlHelper.delete(Savor.ModelHelper.model(SavorBaseTest.class), null,
+//				Savor.Helper.newHashMap("id", 100)));
+//		System.out.println(Savor.SqlHelper.update(Savor.ModelHelper.model(SavorBaseTest.class), null,
+//				Savor.Helper.newHashMap("name", "kj"), Savor.Helper.newHashMap("id", 100)));
+//		System.out.println(Savor.SqlHelper.select(Savor.ModelHelper.model(SavorBaseTest.class), null, null,
+//				Savor.Helper.newHashMap("id#lt", 100), null, null, null));
 	}
 
 	public static void test(String[] args) throws SQLException {
