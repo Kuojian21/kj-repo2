@@ -6,7 +6,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>com.kj.repo</groupId>
-		<artifactId>kj-repo</artifactId>
+		<artifactId>kj-repo2</artifactId>
 		<version>1.0-SNAPSHOT</version>
 	</parent>
 	<artifactId>kj-repo-rxjava</artifactId>
