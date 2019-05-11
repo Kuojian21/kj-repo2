@@ -4,17 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
-import java.security.MessageDigest;
-import java.security.Signature;
-import java.security.SignatureException;
 import java.util.function.BiFunction;
-
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.Mac;
 import com.google.common.base.Strings;
-import com.google.protobuf.ByteString;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.SftpException;
 
@@ -37,10 +28,8 @@ public class Helper {
 		return (T) enhancer.create();
 	}
 
-	
-
 	public boolean upload(ChannelSftp sftp, String directory, String file, InputStream is)
-					throws SftpException, IOException {
+			throws SftpException, IOException {
 		String root = null;
 		try {
 			root = sftp.pwd();
@@ -78,7 +67,7 @@ public class Helper {
 	}
 
 	public boolean download(ChannelSftp sftp, String directory, String file, OutputStream os)
-					throws IOException, SftpException {
+			throws IOException, SftpException {
 		String root = null;
 		try {
 			root = sftp.pwd();
